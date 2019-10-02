@@ -1,0 +1,95 @@
+---
+title: "fire_STSM"
+author: ""
+date: "12 December 2017"
+output: pdf_document
+---
+
+# Fire state-and-transition toy model
+
+This module contains a VERY simple state-and-transition fire model.
+For now, it is a stand-alone module, that uses the LCC 2005 vegetation map and relies on the `SpaDES::spread2` to calculate fire spread.
+
+# Usage
+
+```{r module_usage}
+library(igraph)
+library(raster)
+library(SpaDES)
+
+moduleDir <- file.path("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/m")
+inputDir <- file.path("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/inputs")
+outputDir <- file.path("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/outputs")
+cacheDir <- file.path("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/cache")
+
+## Get foothills study area
+foothills <- shapefile("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/inputs/Alberta_study_area/Alberta_study_area")
+LCC2005 <- raster("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/inputs/LCC2005_V1_4a.tif")
+
+## simulation parameters
+paths <- list(
+  cachePath = cacheDir,
+  modulePath = moduleDir,
+  inputPath = inputDir,
+  outputPath = outputDir
+)
+
+modules <- list("fire_STSM")
+
+times <- list(start = 0, end = 10)
+
+parameters <- list(
+  fire_STSM = list(.useCache = TRUE, fireSize = 1000, noStartPix = 100)
+)
+
+objects <- list("studyArea" = foothills, "LCC2005" = LCC2005)
+
+mySim <- simInit(times = times, params = parameters, modules = modules,
+                 objects = objects, paths = paths)
+
+dev()
+clearPlot()
+spades(mySim, debug = TRUE)
+```
+
+# Events
+
+## Initialisation
+
+The module is initialised by cropping and reprojecting the full LCC 2005 vegetation raster to a smaller study area (which is now provided externally in the global, or Rmd scripts). 
+
+The LCC 2005 classes are then converted to 5 broader classes: 
+* **Non-burnable**. Vegetation classes that do not burn. Comprises: wetlands (19), wet tundra (23) cropland/woodlands (26, 27,28,29), lichen dominated habitats (30, 31,32), rock outcrops (33), recent burns (34), cities (36), water (37, 38), snow/ice (39)
+* **Grasslands**. Open habitats that burn easily but at low intensities. Comprises classes 17, 18, 20, 21, 22, 24, 25
+* **Shrublands**. Shrub dominated habitats that burn easily at medium intensity. Comprises: old burns (i.e. forest that burned in the last 10y; 35), shrublands (16)
+* **Deciduous forest**. Forests dominated by deciduous trees. Comprises classes 2, 11, 12
+* **Mixed forest**. Forests of deciduos and conifer species. Comprises classes 3, 4, 5, 13, 14, 15
+* **Coniferous forest**. Conifer-dominated forests. Comprises classes 1, 6, 7, 8, 9, 10.
+
+The conversion of LCC classes results in a `vegetation_prefire` raster.
+
+During the initialisation, raster maps of `burnable_areas` and rate-of-spread (`ROS_map`) are created based on the `vegetation_prefire` raster:
+* `burnable_areas` is identical to `vegetation_prefire` except in that NAs are attributed to all "non-burnable" pixels.
+* `ROS_map` contains the relative spread probabilities (probability of "catching fire" from a neighbour pixel) for each class. These are:
+
+```{r ROS_table echo = FALSE}
+knitr::kable(data.frame(Class = c("non-burnable", "grasslands", "shrublands", "deciduous forest", "mixed forest", "coniferous forest"),
+                        ROS = c(0, 0.9, 0.7, 0.2, 0.4, 0.5)), caption = "Rates of spread for vegetation classes")
+```
+
+## Fire spread
+
+Fire spread is calculated using the `SpaDES::spread2` function. This function makes use of the `burnable_areas` and `ROS_map` rasters to calculated where fire spreads to after it is "seeded" in the start pixels (`startPix`). The number of starting pixels is defined as a module parameter (`noStartPix`) and drawn at random from `burnable_areas` raster. Fire sizes (no. of pixels ?) are also determined externally using the parameter `fireSize`.
+
+## Vegetation transitions and calculation of fire severity
+
+After fire map is generated (`spreadRas`) vegetation state transitions are calculated for pixels that burned (that have fire) based on a transition probability matrix (`fire_transitprobs`).
+* Grasslands and shrbulands stay/become grasslands
+* Deciduous and mixed forests become shrublands
+* Conifer forests become mixed forests
+
+Fire severity is then  calculated based on the type of vegetation transitions that occurred after fire:
+* **Low severity** when grasslands burn
+* **Moderate severity** when shrublands burn
+* **High severity** when any type of forest burns
+
