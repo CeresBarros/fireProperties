@@ -214,7 +214,7 @@ firePropertiesInit <- function(sim) {
                              lat = coordinates(pixelGroupMapFBP)[,2],
                              long = coordinates(pixelGroupMapFBP)[,1])
 
-  ## this is no longer necessary as ClimateNA as relative humidity data
+  ## this is no longer necessary as ClimateNA has relative humidity data
   ## relative humidity
   ## using dew point between -3 and 20%, quarterly seasonal for Jun 2013
   ## https://calgary.weatherstats.ca/metrics/dew_point.html
