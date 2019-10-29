@@ -35,6 +35,8 @@ defineModule(sim, list(
     expectsInput(objectName = "ForestFuelTypes", objectClass = "data.table",
                  desc = "Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code), their - or + contribution ('negSwitch'),
                  min and max age for each species"),
+    expectsInput(objectName = "fuelTypesMaps", objectClass = "list",
+                 desc = "List of RasterLayers of fuel types and coniferDominance per pixel."),
     expectsInput(objectName = "FWIinit", objectClass = "data.frame",
                  desc = "Initalisation parameter values for FWI calculations. Defaults to default values in cffdrs::fwi.
                  This table should be updated every year"),
@@ -250,7 +252,7 @@ calcFBPProperties <- function(sim) {
 
   ## now reproject to FBP-compatible crs
   fuelTypeRas <- Cache(postProcess,
-                       x = fuelTypesMaps$finalFuelType,
+                       x = sim$fuelTypesMaps$finalFuelType,
                        rasterToMatch = sim$pixelGroupMapFBP,
                        maskWithRTM = TRUE,
                        method = "ngb",
@@ -259,7 +261,7 @@ calcFBPProperties <- function(sim) {
                        omitArgs = c("userTags"))
 
   coniferDomRas <- Cache(postProcess,
-                         x = fuelTypesMaps$coniferDom,
+                         x = sim$fuelTypesMaps$coniferDom,
                          rasterToMatch = sim$pixelGroupMapFBP,
                          maskWithRTM = TRUE,
                          method = "bilinear",
