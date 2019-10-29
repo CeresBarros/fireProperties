@@ -306,9 +306,10 @@ calcFBPProperties <- function(sim) {
   FTs <- FTs[!is.na(FuelType)]
 
   ## check for duplicates (there shouldn't be any)
-  if (any(duplicated(FTs))) {
-    stop("Duplicated pixels found in fuel types table.",
-         " Please debug Biomass_fireProperties calcFBPProperties() event function")
+  if (getOption("LandR.assertions"))
+    if (any(duplicated(FTs))) {
+      stop("Duplicated pixels found in fuel types table.",
+           " Please debug Biomass_fireProperties calcFBPProperties() event function")
   }
 
   ## FWI ------------------------------
