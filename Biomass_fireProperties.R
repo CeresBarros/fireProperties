@@ -7,7 +7,7 @@ defineModule(sim, list(
   keywords = c("fire behaviour", "fuels", "fire-vegetation feedbacks", "fire-climate feedbacks", "FBP system", "topography"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = numeric_version("0.0.1"),
+  version = numeric_version("0.1.0"),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
