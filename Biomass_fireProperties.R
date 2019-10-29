@@ -42,6 +42,10 @@ defineModule(sim, list(
                  This table should be updated every year"),
     expectsInput(objectName = "pixelGroupMap", objectClass = "RasterLayer",
                  desc = "updated community map at each succession time step"),
+    expectsInput(objectName = "pixelNonForestFuels", objectClass = "data.table",
+                 desc = paste("Table of non forest fuel attributes (pixel ID, land cover, fuel type",
+                              "name and code, and degree of curing) for each pixel with non-forest fuels.
+                               Defaults to NULL, if not provided by another module")),
     expectsInput(objectName = "precipitationRas", objectClass = "RasterLayer",
                  desc = paste0("Raster of summer average precipitation values.",
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
@@ -255,13 +259,50 @@ calcFBPProperties <- function(sim) {
                          filename2 = NULL,
                          userTags = c(cacheTags, "coniferDomRas"),
                          omitArgs = c("userTags"))
+
+  if (!is.null(sim$pixelNonForestFuels)) {
+    curingRas <- Cache(postProcess,
+                       x = sim$fuelTypesMaps$curing,
+                       rasterToMatch = sim$rasterToMatchFBP,
+                       maskWithRTM = TRUE,
+                       method = "bilinear",
+                       filename2 = NULL,
+                       userTags = c(cacheTags, "curingRas"),
+                       omitArgs = c("userTags"))
+  } else {
+    ## post-process fails with a NA raster
+    curingRas <- cropInputs(sim$fuelTypesMaps$curing, rasterToMatch = sim$rasterToMatchFBP)
+    curingRas <- projectInputs(curingRas, rasterToMatch = sim$rasterToMatchFBP)
+    curingRas <- maskInputs(curingRas, rasterToMatch = sim$rasterToMatchFB0, maskWithRTM = TRUE)
+
+    if (getOption("LandR.assertions"))
+      if (!compareRaster(curingRas, sim$rasterToMatchFBP))
+        stop("Can't reproject NA curing raster to rasterToMatchFBP",
+             " Please debug Biomass_fireProperties calcFBPProperties() event function")
+  }
+
+
   ## make table of final fuel types
   FTs <- data.table(ID = seq_len(ncell(sim$rasterToMatchFBP)),
                     FuelType = getValues(fuelTypeRas),
-                    coniferDom = getValues(coniferDomRas))
-  ## add FBP fuel type names
-  FTs <- unique(sim$FuelTypes[, .(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
+                    coniferDom = getValues(coniferDomRas),
+                    curing = getValues(curingRas))
+
+  ## add FBP forest fuel type names
   FTs <- unique(sim$ForestFuelTypes[, .(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
+
+  ## add FBP non-forest fuel type names if running fires in non-forested pixels
+  if (!is.null(sim$pixelNonForestFuels)) {
+    ## unfortunately some pixels are lost here.
+    FTs <- unique(sim$nonForestFuelsTable[,.(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
+    ## a duplicated column was created, containing the missing  fuel type names
+    FTs[is.na(i.FuelTypeFBP) & !is.na(FuelTypeFBP), i.FuelTypeFBP := FuelTypeFBP]
+
+    ## remove duplicated column and rename
+    FTs[, FuelTypeFBP := NULL]
+    setnames(FTs, old = "i.FuelTypeFBP", new = "FuelTypeFBP")
+  }
+
   FTs <- FTs[!is.na(FuelType)]
 
   ## check for duplicates (there shouldn't be any)
@@ -293,7 +334,8 @@ calcFBPProperties <- function(sim) {
   ## make inputs dataframe for FBI
   ## add fuel types and conifer dominance to FWIOutputs
   ## note that because climate/topo data is "larger" there are pixels that have no fuels - these are removed.
-  FWIoutputs <- FTs[FWIoutputs, on = "ID", nomatch = 0]
+  FWIoutputs <- FTs[FWIoutputs, on = "ID", nomatch = 0,
+                    allow.cartesian = TRUE]
 
   ## add slope and aspect
   ## again, only keep pixels that have fuels
@@ -309,7 +351,12 @@ calcFBPProperties <- function(sim) {
                           GS = FWIoutputs$slope,
                           Dj = rep(180, nrow(FWIoutputs)),
                           Aspect = FWIoutputs$aspect,
-                          PC = FWIoutputs$coniferDom)
+                          PC = FWIoutputs$coniferDom,
+                          cc = FWIoutputs$curing)
+
+  if (all(is.na(FBPinputs$cc))) {
+    FBPinputs$cc <- NULL
+  }
 
   FBPoutputs <- suppressWarnings({
     cffdrs::fbp(input = na.omit(FBPinputs), output = "All")
@@ -470,6 +517,10 @@ calcFBPProperties <- function(sim) {
     sim$FWIinit = data.frame(ffmc = 85,
                              dmc = 6,
                              dc = 15)
+  }
+
+  if(!suppliedElsewhere("pixelNonForestFuels", sim)) {
+    sim$pixelNonForestFuels <- NULL
   }
 
   return(invisible(sim))
