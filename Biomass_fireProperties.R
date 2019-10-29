@@ -239,12 +239,7 @@ calcFBPProperties <- function(sim) {
   cacheTags <- c(currentModule(sim), "FBPPercParams")
 
   ## FUEL TYPES ------------------------------
-  ## rasterize fuel types table
-  fuelTypesMaps <- rasterizeReduced(sim$pixelFuelTypes, sim$pixelGroupMap,
-                                    newRasterCols = c("finalFuelType" , "coniferDom"),
-                                    mapcode = "pixelGroup")
-
-  ## now reproject to FBP-compatible crs
+  ## reproject to fuelTypesMaps to FBP-compatible crs
   fuelTypeRas <- Cache(postProcess,
                        x = sim$fuelTypesMaps$finalFuelType,
                        rasterToMatch = sim$rasterToMatchFBP,
