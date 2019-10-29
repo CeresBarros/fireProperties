@@ -40,8 +40,6 @@ defineModule(sim, list(
     expectsInput(objectName = "FWIinit", objectClass = "data.frame",
                  desc = "Initalisation parameter values for FWI calculations. Defaults to default values in cffdrs::fwi.
                  This table should be updated every year"),
-    expectsInput(objectName = "pixelFuelTypes", objectClass = "data.table",
-                 desc = "Fuel types per pixel group, calculated from cohort biomasses"),
     expectsInput(objectName = "pixelGroupMap", objectClass = "RasterLayer",
                  desc = "updated community map at each succession time step"),
     expectsInput(objectName = "precipitationRas", objectClass = "RasterLayer",
@@ -92,10 +90,10 @@ defineModule(sim, list(
     #               desc = "Fire weather inputs table"),
     # createsOutput(objectName = "FWIoutputs", objectClass = "list",
     #               desc = "Fire weather outputs table"),
-    createsOutput(objectName = "pixelGroupMapFBP", objectClass = "RasterLayer",
-                  desc = "updated community map at each succession time step, on FBP-compatible projection"),
     createsOutput(objectName = "precipitationRas", objectClass = "RasterLayer",
                   desc = "Raster of precipitation values - reprojected/cropped"),
+    createsOutput(objectName = "rasterToMatchFBP", objectClass = "RasterLayer",
+                  desc = "a rasterToMatch reprojected to FBP-compatible projection"),
     createsOutput(objectName = "slopeRas", objectClass = "RasterLayer",
                   desc = "Raster of slope values - reprojected/cropped"),
     createsOutput(objectName = "temperatureRas", objectClass = "RasterLayer",
@@ -155,20 +153,19 @@ firePropertiesInit <- function(sim) {
   ## project all inputs to Lat/Long (decimal degrees)
   ## for compatibility with FBP system
 
-  ## buffer pixelGroupMap to prevent data loss, using twice the pixel size and distance
+  ## buffer rasterToMatch to prevent data loss, using twice the pixel size and distance
   ## then reproject to FBP compatible projection and mask buffer out (later)
   ## note: don't mask to area until the end.
-
-  pixelGroupMapFBP <- buffer(sim$pixelGroupMap,
-                             width = res(sim$pixelGroupMap)[1]*2)
-  pixelGroupMapFBP <- projectRaster(pixelGroupMapFBP,
+  rasterToMatchFBP <- buffer(sim$rasterToMatch,
+                             width = res(sim$rasterToMatch)[1]*2)
+  rasterToMatchFBP <- projectRaster(rasterToMatchFBP, method = "ngb",
                                     crs = crs(sim$studyAreaFBP))
 
   ## PROJECT CLIMATE/TOPO RASTERS
   message(blue("Processing climate data for fire weather and fuel calculation"))
   sim$temperatureRas <- Cache(postProcess,
                               x = sim$temperatureRas,
-                              rasterToMatch = pixelGroupMapFBP,
+                              rasterToMatch = rasterToMatchFBP,
                               maskWithRTM = TRUE,
                               method = "bilinear",
                               filename2 = NULL,
@@ -176,7 +173,7 @@ firePropertiesInit <- function(sim) {
                               omitArgs = c("userTags"))
   sim$precipitationRas <- Cache(postProcess,
                                 x = sim$precipitationRas,
-                                rasterToMatch = pixelGroupMapFBP,
+                                rasterToMatch = rasterToMatchFBP,
                                 maskWithRTM = TRUE,
                                 method = "bilinear",
                                 filename2 = NULL,
@@ -184,7 +181,7 @@ firePropertiesInit <- function(sim) {
                                 omitArgs = c("userTags"))
   sim$relativeHumRas <- Cache(postProcess,
                               x = sim$relativeHumRas,
-                              rasterToMatch = pixelGroupMapFBP,
+                              rasterToMatch = rasterToMatchFBP,
                               maskWithRTM = TRUE,
                               method = "bilinear",
                               filename2 = NULL,
@@ -192,7 +189,7 @@ firePropertiesInit <- function(sim) {
                               omitArgs = c("userTags"))
   sim$slopeRas <- Cache(postProcess,
                         x = sim$slopeRas,
-                        rasterToMatch = pixelGroupMapFBP,
+                        rasterToMatch = rasterToMatchFBP,
                         maskWithRTM = TRUE,
                         method = "bilinear",
                         filename2 = NULL,
@@ -200,7 +197,7 @@ firePropertiesInit <- function(sim) {
                         omitArgs = c("userTags"))
   sim$aspectRas <- Cache(postProcess,
                          x = sim$aspectRas,
-                         rasterToMatch = pixelGroupMapFBP,
+                         rasterToMatch = rasterToMatchFBP,
                          maskWithRTM = TRUE,
                          method = "bilinear",
                          filename2 = NULL,
@@ -208,13 +205,14 @@ firePropertiesInit <- function(sim) {
                          omitArgs = c("userTags"))
 
   ## TOPOCLIMDATA TABLE ----------------------
-  topoClimData <- data.table(ID = 1:length(pixelGroupMapFBP),
-                             pixelGroup = getValues(pixelGroupMapFBP),
+  ## TODO: change to draw from fire weather distributions
+  topoClimData <- data.table(ID = seq_len(ncell(rasterToMatchFBP)),
+                             pixelGroup = getValues(rasterToMatchFBP),
                              temp = getValues(sim$temperatureRas), precip = getValues(sim$precipitationRas),
                              relHum = getValues(sim$relativeHumRas),
                              slope = getValues(sim$slopeRas), aspect = getValues(sim$aspectRas),
-                             lat = coordinates(pixelGroupMapFBP)[,2],
-                             long = coordinates(pixelGroupMapFBP)[,1])
+                             lat = coordinates(rasterToMatchFBP)[,2],
+                             long = coordinates(rasterToMatchFBP)[,1])
 
   ## this is no longer necessary as ClimateNA has relative humidity data
   ## relative humidity
@@ -223,7 +221,7 @@ firePropertiesInit <- function(sim) {
   # topoClimData[, relHum := RH(t = topoClimData$temp, Td = runif (nrow(topoClimData), -3, 20), isK = FALSE)]
 
   ## export to sim
-  sim$pixelGroupMapFBP <- pixelGroupMapFBP
+  sim$rasterToMatchFBP <- rasterToMatchFBP
   sim$topoClimData <- topoClimData
 
   return(invisible(sim))
@@ -232,17 +230,6 @@ firePropertiesInit <- function(sim) {
 ## Derive fire parameters from FBP system - rasters need to be in lat/long
 calcFBPProperties <- function(sim) {
   cacheTags <- c(currentModule(sim), "FBPPercParams")
-
-  ## redo only if pixelGroupMap has been updated
-  if (time(sim) != start(sim)) {
-    pixelGroupMapFBP <- buffer(sim$pixelGroupMap,
-                               width = res(sim$pixelGroupMap)[1]*2)
-    pixelGroupMapFBP <- projectRaster(pixelGroupMapFBP,
-                                      crs = crs(sim$studyAreaFBP))
-    ## export to sim and clean ws
-    sim$pixelGroupMapFBP <- pixelGroupMapFBP
-    rm(pixelGroupMapFBP); amc::.gc()
-  }
 
   ## FUEL TYPES ------------------------------
   ## rasterize fuel types table
@@ -253,7 +240,7 @@ calcFBPProperties <- function(sim) {
   ## now reproject to FBP-compatible crs
   fuelTypeRas <- Cache(postProcess,
                        x = sim$fuelTypesMaps$finalFuelType,
-                       rasterToMatch = sim$pixelGroupMapFBP,
+                       rasterToMatch = sim$rasterToMatchFBP,
                        maskWithRTM = TRUE,
                        method = "ngb",
                        filename2 = NULL,
@@ -262,14 +249,14 @@ calcFBPProperties <- function(sim) {
 
   coniferDomRas <- Cache(postProcess,
                          x = sim$fuelTypesMaps$coniferDom,
-                         rasterToMatch = sim$pixelGroupMapFBP,
+                         rasterToMatch = sim$rasterToMatchFBP,
                          maskWithRTM = TRUE,
                          method = "bilinear",
                          filename2 = NULL,
                          userTags = c(cacheTags, "coniferDomRas"),
                          omitArgs = c("userTags"))
   ## make table of final fuel types
-  FTs <- data.table(ID = 1:length(sim$pixelGroupMapFBP),
+  FTs <- data.table(ID = seq_len(ncell(sim$rasterToMatchFBP)),
                     FuelType = getValues(fuelTypeRas),
                     coniferDom = getValues(coniferDomRas))
   ## add FBP fuel type names
@@ -285,7 +272,6 @@ calcFBPProperties <- function(sim) {
 
   ## FWI ------------------------------
   ## make/update table of FWI inputs
-  # browser()
   FWIinputs <- data.frame(id = sim$topoClimData$ID,
                           lat = sim$topoClimData$lat,
                           long = sim$topoClimData$long,
@@ -343,33 +329,33 @@ calcFBPProperties <- function(sim) {
   ## note that after rasterizing it is safer to mask, in case some of
   ## the buffer artefacts come through
   FBPOutputsSf <- st_transform(FBPOutputsSf,
-                               crs = as.character(crs(sim$pixelGroupMap)))
+                               crs = as.character(crs(sim$rasterToMatch)))
   FBPOutputsPoly <- as_Spatial(FBPOutputsSf)
 
   ## Crown fraction burnt
-  sim$fireCFBRas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireCFBRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "CFB", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireCFBRas <- mask(sim$fireCFBRas, sim$pixelGroupMap)
+  sim$fireCFBRas <- mask(sim$fireCFBRas, sim$rasterToMatch)
 
   ## Head fire intensity
-  sim$fireIntRas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireIntRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "HFI", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireIntRas <- mask(sim$fireIntRas, sim$pixelGroupMap)
+  sim$fireIntRas <- mask(sim$fireIntRas, sim$rasterToMatch)
 
   ## Rate of spread
-  sim$fireROSRas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireROSRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "ROS", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireROSRas <- mask(sim$fireROSRas, sim$pixelGroupMap)
+  sim$fireROSRas <- mask(sim$fireROSRas, sim$rasterToMatch)
 
   ## Critical spread rate for crowning
-  sim$fireRSORas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireRSORas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "RSO", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireRSORas <- mask(sim$fireRSORas, sim$pixelGroupMap)
+  sim$fireRSORas <- mask(sim$fireRSORas, sim$rasterToMatch)
 
   ## Total fuel consumption
-  sim$fireTFCRas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireTFCRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "TFC", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireTFCRas <- mask(sim$fireTFCRas, sim$pixelGroupMap)
+  sim$fireTFCRas <- mask(sim$fireTFCRas, sim$rasterToMatch)
 
   ## export to sim
   # sim$FWIinputs <- FWIinputs
