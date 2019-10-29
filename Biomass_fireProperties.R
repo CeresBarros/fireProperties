@@ -150,6 +150,9 @@ firePropertiesInit <- function(sim) {
   cacheTags <- c(currentModule(sim), "firePropertiesInit")
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
 
+  ## checks
+  if (start(sim) == P(sim)$fireInitialTime)
+    warning(red("start(sim) and P(sim)$fireInitialTime are the same.\nThis may create bad scheduling with init events"))
 
   ## define first fire year
   sim$fireYear <- as.integer(P(sim)$fireInitialTime)
