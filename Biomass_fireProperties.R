@@ -32,7 +32,7 @@ defineModule(sim, list(
   inputObjects = bind_rows(
     expectsInput(objectName = "aspectRas", objectClass = "RasterLayer",
                  desc = "Raster of aspect values - needs to be previously downloaded at this point"),
-    expectsInput(objectName = "FuelTypes", objectClass = "data.table",
+    expectsInput(objectName = "ForestFuelTypes", objectClass = "data.table",
                  desc = "Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code), their - or + contribution ('negSwitch'),
                  min and max age for each species"),
     expectsInput(objectName = "FWIinit", objectClass = "data.frame",
@@ -272,6 +272,7 @@ calcFBPProperties <- function(sim) {
                     coniferDom = getValues(coniferDomRas))
   ## add FBP fuel type names
   FTs <- unique(sim$FuelTypes[, .(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
+  FTs <- unique(sim$ForestFuelTypes[, .(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
   FTs <- FTs[!is.na(FuelType)]
 
   ## check for duplicates (there shouldn't be any)
