@@ -7,7 +7,7 @@ defineModule(sim, list(
   keywords = c("fire behaviour", "fuels", "fire-vegetation feedbacks", "fire-climate feedbacks", "FBP system", "topography"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = numeric_version("0.0.1"),
+  version = numeric_version("0.1.0"),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
@@ -40,14 +40,18 @@ defineModule(sim, list(
     expectsInput(objectName = "FWIinit", objectClass = "data.frame",
                  desc = "Initalisation parameter values for FWI calculations. Defaults to default values in cffdrs::fwi.
                  This table should be updated every year"),
-    expectsInput(objectName = "pixelFuelTypes", objectClass = "data.table",
-                 desc = "Fuel types per pixel group, calculated from cohort biomasses"),
     expectsInput(objectName = "pixelGroupMap", objectClass = "RasterLayer",
                  desc = "updated community map at each succession time step"),
+    expectsInput(objectName = "pixelNonForestFuels", objectClass = "data.table",
+                 desc = paste("Table of non forest fuel attributes (pixel ID, land cover, fuel type",
+                              "name and code, and degree of curing) for each pixel with non-forest fuels.
+                               Defaults to NULL, if not provided by another module")),
     expectsInput(objectName = "precipitationRas", objectClass = "RasterLayer",
                  desc = paste0("Raster of summer average precipitation values.",
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
                  sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
+    expectsInput(objectName = "rasterToMatchFBP", objectClass = "RasterLayer",
+                  desc = "a rasterToMatch reprojected to FBP-compatible projection"),
     expectsInput(objectName = "relativeHumRas", objectClass = "RasterLayer",
                  desc = paste0("Raster of summer average realtive humidity values.",
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
@@ -92,10 +96,10 @@ defineModule(sim, list(
     #               desc = "Fire weather inputs table"),
     # createsOutput(objectName = "FWIoutputs", objectClass = "list",
     #               desc = "Fire weather outputs table"),
-    createsOutput(objectName = "pixelGroupMapFBP", objectClass = "RasterLayer",
-                  desc = "updated community map at each succession time step, on FBP-compatible projection"),
     createsOutput(objectName = "precipitationRas", objectClass = "RasterLayer",
                   desc = "Raster of precipitation values - reprojected/cropped"),
+    createsOutput(objectName = "rasterToMatchFBP", objectClass = "RasterLayer",
+                  desc = "a rasterToMatch reprojected to FBP-compatible projection"),
     createsOutput(objectName = "slopeRas", objectClass = "RasterLayer",
                   desc = "Raster of slope values - reprojected/cropped"),
     createsOutput(objectName = "temperatureRas", objectClass = "RasterLayer",
@@ -148,6 +152,9 @@ firePropertiesInit <- function(sim) {
   cacheTags <- c(currentModule(sim), "firePropertiesInit")
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
 
+  ## checks
+  if (start(sim) == P(sim)$fireInitialTime)
+    warning(red("start(sim) and P(sim)$fireInitialTime are the same.\nThis may create bad scheduling with init events"))
 
   ## define first fire year
   sim$fireYear <- as.integer(P(sim)$fireInitialTime)
@@ -155,20 +162,19 @@ firePropertiesInit <- function(sim) {
   ## project all inputs to Lat/Long (decimal degrees)
   ## for compatibility with FBP system
 
-  ## buffer pixelGroupMap to prevent data loss, using twice the pixel size and distance
+  ## buffer rasterToMatch to prevent data loss, using twice the pixel size and distance
   ## then reproject to FBP compatible projection and mask buffer out (later)
   ## note: don't mask to area until the end.
-
-  pixelGroupMapFBP <- buffer(sim$pixelGroupMap,
-                             width = res(sim$pixelGroupMap)[1]*2)
-  pixelGroupMapFBP <- projectRaster(pixelGroupMapFBP,
+  rasterToMatchFBP <- buffer(sim$rasterToMatch,
+                             width = res(sim$rasterToMatch)[1]*2)
+  rasterToMatchFBP <- projectRaster(rasterToMatchFBP, method = "ngb",
                                     crs = crs(sim$studyAreaFBP))
 
   ## PROJECT CLIMATE/TOPO RASTERS
   message(blue("Processing climate data for fire weather and fuel calculation"))
   sim$temperatureRas <- Cache(postProcess,
                               x = sim$temperatureRas,
-                              rasterToMatch = pixelGroupMapFBP,
+                              rasterToMatch = rasterToMatchFBP,
                               maskWithRTM = TRUE,
                               method = "bilinear",
                               filename2 = NULL,
@@ -176,7 +182,7 @@ firePropertiesInit <- function(sim) {
                               omitArgs = c("userTags"))
   sim$precipitationRas <- Cache(postProcess,
                                 x = sim$precipitationRas,
-                                rasterToMatch = pixelGroupMapFBP,
+                                rasterToMatch = rasterToMatchFBP,
                                 maskWithRTM = TRUE,
                                 method = "bilinear",
                                 filename2 = NULL,
@@ -184,7 +190,7 @@ firePropertiesInit <- function(sim) {
                                 omitArgs = c("userTags"))
   sim$relativeHumRas <- Cache(postProcess,
                               x = sim$relativeHumRas,
-                              rasterToMatch = pixelGroupMapFBP,
+                              rasterToMatch = rasterToMatchFBP,
                               maskWithRTM = TRUE,
                               method = "bilinear",
                               filename2 = NULL,
@@ -192,7 +198,7 @@ firePropertiesInit <- function(sim) {
                               omitArgs = c("userTags"))
   sim$slopeRas <- Cache(postProcess,
                         x = sim$slopeRas,
-                        rasterToMatch = pixelGroupMapFBP,
+                        rasterToMatch = rasterToMatchFBP,
                         maskWithRTM = TRUE,
                         method = "bilinear",
                         filename2 = NULL,
@@ -200,7 +206,7 @@ firePropertiesInit <- function(sim) {
                         omitArgs = c("userTags"))
   sim$aspectRas <- Cache(postProcess,
                          x = sim$aspectRas,
-                         rasterToMatch = pixelGroupMapFBP,
+                         rasterToMatch = rasterToMatchFBP,
                          maskWithRTM = TRUE,
                          method = "bilinear",
                          filename2 = NULL,
@@ -208,13 +214,14 @@ firePropertiesInit <- function(sim) {
                          omitArgs = c("userTags"))
 
   ## TOPOCLIMDATA TABLE ----------------------
-  topoClimData <- data.table(ID = 1:length(pixelGroupMapFBP),
-                             pixelGroup = getValues(pixelGroupMapFBP),
+  ## TODO: change to draw from fire weather distributions
+  topoClimData <- data.table(ID = seq_len(ncell(rasterToMatchFBP)),
+                             pixelGroup = getValues(rasterToMatchFBP),
                              temp = getValues(sim$temperatureRas), precip = getValues(sim$precipitationRas),
                              relHum = getValues(sim$relativeHumRas),
                              slope = getValues(sim$slopeRas), aspect = getValues(sim$aspectRas),
-                             lat = coordinates(pixelGroupMapFBP)[,2],
-                             long = coordinates(pixelGroupMapFBP)[,1])
+                             lat = coordinates(rasterToMatchFBP)[,2],
+                             long = coordinates(rasterToMatchFBP)[,1])
 
   ## this is no longer necessary as ClimateNA has relative humidity data
   ## relative humidity
@@ -223,7 +230,7 @@ firePropertiesInit <- function(sim) {
   # topoClimData[, relHum := RH(t = topoClimData$temp, Td = runif (nrow(topoClimData), -3, 20), isK = FALSE)]
 
   ## export to sim
-  sim$pixelGroupMapFBP <- pixelGroupMapFBP
+  sim$rasterToMatchFBP <- rasterToMatchFBP
   sim$topoClimData <- topoClimData
 
   return(invisible(sim))
@@ -233,27 +240,11 @@ firePropertiesInit <- function(sim) {
 calcFBPProperties <- function(sim) {
   cacheTags <- c(currentModule(sim), "FBPPercParams")
 
-  ## redo only if pixelGroupMap has been updated
-  if (time(sim) != start(sim)) {
-    pixelGroupMapFBP <- buffer(sim$pixelGroupMap,
-                               width = res(sim$pixelGroupMap)[1]*2)
-    pixelGroupMapFBP <- projectRaster(pixelGroupMapFBP,
-                                      crs = crs(sim$studyAreaFBP))
-    ## export to sim and clean ws
-    sim$pixelGroupMapFBP <- pixelGroupMapFBP
-    rm(pixelGroupMapFBP); amc::.gc()
-  }
-
   ## FUEL TYPES ------------------------------
-  ## rasterize fuel types table
-  fuelTypesMaps <- rasterizeReduced(sim$pixelFuelTypes, sim$pixelGroupMap,
-                                    newRasterCols = c("finalFuelType" , "coniferDom"),
-                                    mapcode = "pixelGroup")
-
-  ## now reproject to FBP-compatible crs
+  ## reproject to fuelTypesMaps to FBP-compatible crs
   fuelTypeRas <- Cache(postProcess,
                        x = sim$fuelTypesMaps$finalFuelType,
-                       rasterToMatch = sim$pixelGroupMapFBP,
+                       rasterToMatch = sim$rasterToMatchFBP,
                        maskWithRTM = TRUE,
                        method = "ngb",
                        filename2 = NULL,
@@ -262,30 +253,67 @@ calcFBPProperties <- function(sim) {
 
   coniferDomRas <- Cache(postProcess,
                          x = sim$fuelTypesMaps$coniferDom,
-                         rasterToMatch = sim$pixelGroupMapFBP,
+                         rasterToMatch = sim$rasterToMatchFBP,
                          maskWithRTM = TRUE,
                          method = "bilinear",
                          filename2 = NULL,
                          userTags = c(cacheTags, "coniferDomRas"),
                          omitArgs = c("userTags"))
+
+  if (!is.null(sim$pixelNonForestFuels)) {
+    curingRas <- Cache(postProcess,
+                       x = sim$fuelTypesMaps$curing,
+                       rasterToMatch = sim$rasterToMatchFBP,
+                       maskWithRTM = TRUE,
+                       method = "bilinear",
+                       filename2 = NULL,
+                       userTags = c(cacheTags, "curingRas"),
+                       omitArgs = c("userTags"))
+  } else {
+    ## post-process fails with a NA raster
+    curingRas <- cropInputs(sim$fuelTypesMaps$curing, rasterToMatch = sim$rasterToMatchFBP)
+    curingRas <- projectInputs(curingRas, rasterToMatch = sim$rasterToMatchFBP)
+    curingRas <- maskInputs(curingRas, rasterToMatch = sim$rasterToMatchFB0, maskWithRTM = TRUE)
+
+    if (getOption("LandR.assertions"))
+      if (!compareRaster(curingRas, sim$rasterToMatchFBP))
+        stop("Can't reproject NA curing raster to rasterToMatchFBP",
+             " Please debug Biomass_fireProperties calcFBPProperties() event function")
+  }
+
+
   ## make table of final fuel types
-  FTs <- data.table(ID = 1:length(sim$pixelGroupMapFBP),
+  FTs <- data.table(ID = seq_len(ncell(sim$rasterToMatchFBP)),
                     FuelType = getValues(fuelTypeRas),
-                    coniferDom = getValues(coniferDomRas))
-  ## add FBP fuel type names
-  FTs <- unique(sim$FuelTypes[, .(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
+                    coniferDom = getValues(coniferDomRas),
+                    curing = getValues(curingRas))
+
+  ## add FBP forest fuel type names
   FTs <- unique(sim$ForestFuelTypes[, .(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
+
+  ## add FBP non-forest fuel type names if running fires in non-forested pixels
+  if (!is.null(sim$pixelNonForestFuels)) {
+    ## unfortunately some pixels are lost here.
+    FTs <- unique(sim$nonForestFuelsTable[,.(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
+    ## a duplicated column was created, containing the missing  fuel type names
+    FTs[is.na(i.FuelTypeFBP) & !is.na(FuelTypeFBP), i.FuelTypeFBP := FuelTypeFBP]
+
+    ## remove duplicated column and rename
+    FTs[, FuelTypeFBP := NULL]
+    setnames(FTs, old = "i.FuelTypeFBP", new = "FuelTypeFBP")
+  }
+
   FTs <- FTs[!is.na(FuelType)]
 
   ## check for duplicates (there shouldn't be any)
-  if (any(duplicated(FTs))) {
-    stop("Duplicated pixels found in fuel types table.",
-         " Please debug Biomass_fireProperties calcFBPProperties() event function")
+  if (getOption("LandR.assertions"))
+    if (any(duplicated(FTs))) {
+      stop("Duplicated pixels found in fuel types table.",
+           " Please debug Biomass_fireProperties calcFBPProperties() event function")
   }
 
   ## FWI ------------------------------
   ## make/update table of FWI inputs
-  # browser()
   FWIinputs <- data.frame(id = sim$topoClimData$ID,
                           lat = sim$topoClimData$lat,
                           long = sim$topoClimData$long,
@@ -307,7 +335,8 @@ calcFBPProperties <- function(sim) {
   ## make inputs dataframe for FBI
   ## add fuel types and conifer dominance to FWIOutputs
   ## note that because climate/topo data is "larger" there are pixels that have no fuels - these are removed.
-  FWIoutputs <- FTs[FWIoutputs, on = "ID", nomatch = 0]
+  FWIoutputs <- FTs[FWIoutputs, on = "ID", nomatch = 0,
+                    allow.cartesian = TRUE]
 
   ## add slope and aspect
   ## again, only keep pixels that have fuels
@@ -323,7 +352,12 @@ calcFBPProperties <- function(sim) {
                           GS = FWIoutputs$slope,
                           Dj = rep(180, nrow(FWIoutputs)),
                           Aspect = FWIoutputs$aspect,
-                          PC = FWIoutputs$coniferDom)
+                          PC = FWIoutputs$coniferDom,
+                          cc = FWIoutputs$curing)
+
+  if (all(is.na(FBPinputs$cc))) {
+    FBPinputs$cc <- NULL
+  }
 
   FBPoutputs <- suppressWarnings({
     cffdrs::fbp(input = na.omit(FBPinputs), output = "All")
@@ -343,33 +377,33 @@ calcFBPProperties <- function(sim) {
   ## note that after rasterizing it is safer to mask, in case some of
   ## the buffer artefacts come through
   FBPOutputsSf <- st_transform(FBPOutputsSf,
-                               crs = as.character(crs(sim$pixelGroupMap)))
+                               crs = as.character(crs(sim$rasterToMatch)))
   FBPOutputsPoly <- as_Spatial(FBPOutputsSf)
 
   ## Crown fraction burnt
-  sim$fireCFBRas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireCFBRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "CFB", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireCFBRas <- mask(sim$fireCFBRas, sim$pixelGroupMap)
+  sim$fireCFBRas <- mask(sim$fireCFBRas, sim$rasterToMatch)
 
   ## Head fire intensity
-  sim$fireIntRas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireIntRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "HFI", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireIntRas <- mask(sim$fireIntRas, sim$pixelGroupMap)
+  sim$fireIntRas <- mask(sim$fireIntRas, sim$rasterToMatch)
 
   ## Rate of spread
-  sim$fireROSRas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireROSRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "ROS", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireROSRas <- mask(sim$fireROSRas, sim$pixelGroupMap)
+  sim$fireROSRas <- mask(sim$fireROSRas, sim$rasterToMatch)
 
   ## Critical spread rate for crowning
-  sim$fireRSORas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireRSORas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "RSO", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireRSORas <- mask(sim$fireRSORas, sim$pixelGroupMap)
+  sim$fireRSORas <- mask(sim$fireRSORas, sim$rasterToMatch)
 
   ## Total fuel consumption
-  sim$fireTFCRas <- rasterize(FBPOutputsPoly, sim$pixelGroupMap,
+  sim$fireTFCRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
                               field = "TFC", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireTFCRas <- mask(sim$fireTFCRas, sim$pixelGroupMap)
+  sim$fireTFCRas <- mask(sim$fireTFCRas, sim$rasterToMatch)
 
   ## export to sim
   # sim$FWIinputs <- FWIinputs
@@ -484,6 +518,10 @@ calcFBPProperties <- function(sim) {
     sim$FWIinit = data.frame(ffmc = 85,
                              dmc = 6,
                              dc = 15)
+  }
+
+  if(!suppliedElsewhere("pixelNonForestFuels", sim)) {
+    sim$pixelNonForestFuels <- NULL
   }
 
   return(invisible(sim))
