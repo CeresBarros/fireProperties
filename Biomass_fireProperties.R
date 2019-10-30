@@ -50,6 +50,8 @@ defineModule(sim, list(
                  desc = paste0("Raster of summer average precipitation values.",
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
                  sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
+    expectsInput(objectName = "rasterToMatchFBP", objectClass = "RasterLayer",
+                  desc = "a rasterToMatch reprojected to FBP-compatible projection"),
     expectsInput(objectName = "relativeHumRas", objectClass = "RasterLayer",
                  desc = paste0("Raster of summer average realtive humidity values.",
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
