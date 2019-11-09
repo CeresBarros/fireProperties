@@ -13,7 +13,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.txt", "Biomass_fireProperties.Rmd"),
-  reqdPkgs = list("R.utils", "raster", "data.table", "dplyr", #"cffdrs",  ## cffdrs is causing installation problems
+  reqdPkgs = list("R.utils", "raster", "data.table", "dplyr",
                   "sf", "cffdrs",
                   "PredictiveEcology/SpaDES.core@development",
                   "PredictiveEcology/SpaDES.tools@development",
@@ -53,7 +53,7 @@ defineModule(sim, list(
     expectsInput(objectName = "rasterToMatchFBP", objectClass = "RasterLayer",
                   desc = "a rasterToMatch reprojected to FBP-compatible projection"),
     expectsInput(objectName = "relativeHumRas", objectClass = "RasterLayer",
-                 desc = paste0("Raster of summer average realtive humidity values.",
+                 desc = paste0("Raster of summer average relative humidity values.",
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
                  sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
     expectsInput(objectName = "simulatedBiomassMap", objectClass = "RasterLayer",
