@@ -100,6 +100,8 @@ defineModule(sim, list(
                   desc = "Raster of precipitation values - reprojected/cropped"),
     createsOutput(objectName = "rasterToMatchFBP", objectClass = "RasterLayer",
                   desc = "a rasterToMatch reprojected to FBP-compatible projection"),
+    createsOutput(objectName = "relativeHumRas", objectClass = "RasterLayer",
+                 desc = paste0("Raster of summer average relative humidity values - reprojected/cropped")),
     createsOutput(objectName = "slopeRas", objectClass = "RasterLayer",
                   desc = "Raster of slope values - reprojected/cropped"),
     createsOutput(objectName = "temperatureRas", objectClass = "RasterLayer",
