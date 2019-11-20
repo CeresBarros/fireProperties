@@ -72,7 +72,11 @@ defineModule(sim, list(
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
                  sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
     expectsInput(objectName = "topoClimData", objectClass = "data.table",
-                 desc = "Climate data table with temperature, precipitation and relative humidity for each pixelGroup")
+                 desc = "Climate data table with temperature, precipitation and relative humidity for each pixelGroup"),
+    expectsInput(objectName = "windSpeedRas", objectClass = "RasterLayer",
+                  desc = paste("Raster of daily mean wind speed at 10m (Jun-Aug). Defaults to a dummy raster of spatially",
+                               "constant wind speed of 8.5 km/h, which corresponds to the average dayly wind speed (Jun-Aug) calculated",
+                               "from Canada-US climate normals 1961-1990, using BioSIM"))
   ),
   outputObjects = bind_rows(
     # createsOutput(objectName = "FBPinputs", objectClass = "RasterLayer",
