@@ -50,15 +50,15 @@ defineModule(sim, list(
                  desc = paste0("Raster of summer average precipitation values.",
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
                  sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
+    expectsInput("rasterToMatch", "RasterLayer",
+                 desc = "a raster of the studyArea in the same resolution and projection as rawBiomassMap",
+                 sourceURL = NA),
     expectsInput(objectName = "rasterToMatchFBP", objectClass = "RasterLayer",
                   desc = "a rasterToMatch reprojected to FBP-compatible projection"),
     expectsInput(objectName = "relativeHumRas", objectClass = "RasterLayer",
                  desc = paste0("Raster of summer average relative humidity values.",
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
                  sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
-    expectsInput(objectName = "simulatedBiomassMap", objectClass = "RasterLayer",
-                 desc = "Biomass map at each succession time step. Default is Canada national biomass map",
-                 sourceURL = "http://tree.pfc.forestry.ca/kNN-StructureBiomass.tar"),
     expectsInput(objectName = "slopeRas", objectClass = "RasterLayer",
                  desc = "Raster of slope values - needs to be previously downloaded at this point"),
     expectsInput("studyArea", "SpatialPolygonsDataFrame",
@@ -442,6 +442,63 @@ calcFBPProperties <- function(sim) {
   ## if necessary reproject to lat/long - for compatibility with FBP
   if (!identical(latLong, crs(sim$studyAreaFBP))) {
     sim$studyAreaFBP <- spTransform(sim$studyAreaFBP, latLong) #faster without Cache
+  }
+
+  ## RASTER TO MATCH
+  needRTM <- FALSE
+  if (is.null(sim$rasterToMatch)) {
+    if (!suppliedElsewhere("rasterToMatch", sim)) {      ## if one is not provided, re do both (safer?)
+      needRTM <- TRUE
+      message("There is no rasterToMatch supplied; will attempt to use rawBiomassMap")
+    } else {
+      stop("rasterToMatch is going to be supplied, but ", currentModule(sim), " requires it ",
+           "as part of its .inputObjects. Please make it accessible to ", currentModule(sim),
+           " in the .inputObjects by passing it in as an object in simInit(objects = list(rasterToMatch = aRaster)",
+           " or in a module that gets loaded prior to ", currentModule(sim))
+    }
+  }
+
+  if (needRTM) {
+    if (!suppliedElsewhere("rawBiomassMap", sim)) {
+      url <- paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
+                    "canada-forests-attributes_attributs-forests-canada/2001-attributes_attributs-2001/")
+      fileURLs <- getURL(url, dirlistonly = TRUE)
+      fileNames <- getHTMLLinks(fileURLs)
+      rawBiomassMapFilename <- grep("Biomass_TotalLiveAboveGround.*.tif$", fileNames, value = TRUE)
+      rawBiomassMapURL <- paste0(url, rawBiomassMapFilename)
+
+      rawBiomassMap <- Cache(prepInputs,
+                             targetFile = rawBiomassMapFilename,
+                             url = rawBiomassMapURL,
+                             destinationPath = dPath,
+                             studyArea = sim$studyArea,
+                             rasterToMatch = if (!needRTM) sim$rasterToMatch else NULL,
+                             # maskWithRTM = TRUE,    ## if RTM not supplied no masking happens (is this intended?)
+                             maskWithRTM = if (!needRTM) TRUE else FALSE,
+                             ## TODO: if RTM is not needed use SA CRS? -> this is not correct
+                             # useSAcrs = if (!needRTM) TRUE else FALSE,
+                             useSAcrs = FALSE,     ## never use SA CRS
+                             method = "bilinear",
+                             datatype = "INT2U",
+                             filename2 = NULL,
+                             userTags = c(cacheTags, "rawBiomassMap"),
+                             omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
+    }
+
+    ## if we need rasterToMatchLarge, that means a) we don't have it, but b) we will have rawBiomassMap
+    if (is.null(sim$rasterToMatch))
+      warning(paste0("rasterToMatchLarge is missing and will be created \n",
+                     "from rawBiomassMap and studyAreaLarge.\n
+              If this is wrong, provide raster"))
+
+    sim$rasterToMatch <- rawBiomassMap
+    RTMvals <- getValues(sim$rasterToMatch)
+    sim$rasterToMatch[!is.na(RTMvals)] <- 1
+    sim$rasterToMatch <- Cache(writeOutputs, sim$rasterToMatch,
+                                    filename2 = file.path(cachePath(sim), "rasters", "rasterToMatch.tif"),
+                                    datatype = "INT2U", overwrite = TRUE,
+                                    userTags = c(cacheTags, "rasterToMatch"),
+                                    omitArgs = c("userTags"))s
   }
 
   ## DEFAULT TOPO, TEMPERATURE AND PRECIPITATION
