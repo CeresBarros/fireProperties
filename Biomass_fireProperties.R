@@ -498,7 +498,7 @@ calcFBPProperties <- function(sim) {
                                     filename2 = file.path(cachePath(sim), "rasters", "rasterToMatch.tif"),
                                     datatype = "INT2U", overwrite = TRUE,
                                     userTags = c(cacheTags, "rasterToMatch"),
-                                    omitArgs = c("userTags"))s
+                                    omitArgs = c("userTags"))
   }
 
   ## DEFAULT TOPO, TEMPERATURE AND PRECIPITATION
