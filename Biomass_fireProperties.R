@@ -57,7 +57,7 @@ defineModule(sim, list(
                  desc = "a raster of the studyArea in the same resolution and projection as rawBiomassMap",
                  sourceURL = NA),
     expectsInput(objectName = "rasterToMatchFBP", objectClass = "RasterLayer",
-                  desc = "a rasterToMatch reprojected to FBP-compatible projection"),
+                 desc = "a rasterToMatch reprojected to FBP-compatible projection"),
     expectsInput(objectName = "relativeHumRas", objectClass = "RasterLayer",
                  desc = paste0("Raster of summer average relative humidity values.",
                                "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
@@ -77,9 +77,9 @@ defineModule(sim, list(
     expectsInput(objectName = "topoClimData", objectClass = "data.table",
                  desc = "Climate data table with temperature, precipitation and relative humidity for each pixelGroup"),
     expectsInput(objectName = "windSpeedRas", objectClass = "RasterLayer",
-                  desc = paste("Raster of daily mean wind speed at 10m (Jun-Aug). Defaults to a dummy raster of spatially",
-                               "constant wind speed of 8.5 km/h, which corresponds to the average dayly wind speed (Jun-Aug) calculated",
-                               "from Canada-US climate normals 1961-1990, using BioSIM"))
+                 desc = paste("Raster of daily mean wind speed at 10m (Jun-Aug). Defaults to a dummy raster of spatially",
+                              "constant wind speed of 8.5 km/h, which corresponds to the average dayly wind speed (Jun-Aug) calculated",
+                              "from Canada-US climate normals 1961-1990, using BioSIM"))
   ),
   outputObjects = bind_rows(
     # createsOutput(objectName = "FBPinputs", objectClass = "RasterLayer",
@@ -108,7 +108,7 @@ defineModule(sim, list(
     createsOutput(objectName = "rasterToMatchFBP", objectClass = "RasterLayer",
                   desc = "a rasterToMatch reprojected to FBP-compatible projection"),
     createsOutput(objectName = "relativeHumRas", objectClass = "RasterLayer",
-                 desc = paste0("Raster of summer average relative humidity values - reprojected/cropped")),
+                  desc = paste0("Raster of summer average relative humidity values - reprojected/cropped")),
     createsOutput(objectName = "slopeRas", objectClass = "RasterLayer",
                   desc = "Raster of slope values - reprojected/cropped"),
     createsOutput(objectName = "temperatureRas", objectClass = "RasterLayer",
@@ -319,7 +319,7 @@ calcFBPProperties <- function(sim) {
     if (any(duplicated(FTs))) {
       stop("Duplicated pixels found in fuel types table.",
            " Please debug Biomass_fireProperties calcFBPProperties() event function")
-  }
+    }
 
   ## FWI ------------------------------
   ## make/update table of FWI inputs
@@ -496,10 +496,10 @@ calcFBPProperties <- function(sim) {
     RTMvals <- getValues(sim$rasterToMatch)
     sim$rasterToMatch[!is.na(RTMvals)] <- 1
     sim$rasterToMatch <- Cache(writeOutputs, sim$rasterToMatch,
-                                    filename2 = file.path(cachePath(sim), "rasters", "rasterToMatch.tif"),
-                                    datatype = "INT2U", overwrite = TRUE,
-                                    userTags = c(cacheTags, "rasterToMatch"),
-                                    omitArgs = c("userTags"))
+                               filename2 = file.path(cachePath(sim), "rasters", "rasterToMatch.tif"),
+                               datatype = "INT2U", overwrite = TRUE,
+                               userTags = c(cacheTags, "rasterToMatch"),
+                               omitArgs = c("userTags"))
   }
 
   ## DEFAULT TOPO, TEMPERATURE AND PRECIPITATION
