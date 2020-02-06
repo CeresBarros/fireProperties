@@ -502,6 +502,13 @@ calcFBPProperties <- function(sim) {
                                omitArgs = c("userTags"))
   }
 
+  if (!identical(crs(sim$studyArea), crs(sim$rasterToMatch))) {
+    warning(paste0("studyArea and rasterToMatch projections differ.\n",
+                   "studyArea will be projected to match rasterToMatchLarge"))
+    sim$studyArea <- spTransform(sim$studyArea, crs(sim$rasterToMatch))
+    sim$studyArea <- fixErrors(sim$studyArea)
+  }
+
   ## DEFAULT TOPO, TEMPERATURE AND PRECIPITATION
   ## these defaults are only necessary if the rasters are not supplied by another module
   ## climate defaults to Climate NA Data, year 2011, RCP4.5
