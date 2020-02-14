@@ -234,6 +234,7 @@ firePropertiesInit <- function(sim) {
                              aspect = getValues(sim$aspectRas),
                              lat = coordinates(rasterToMatchFBP)[,2],
                              long = coordinates(rasterToMatchFBP)[,1])
+  topoClimData <- na.omit(topoClimData)
 
   ## this is no longer necessary as ClimateNA has relative humidity data
   ## relative humidity
@@ -343,7 +344,7 @@ calcFBPProperties <- function(sim) {
 
   ## calculate FW indices
   FWIoutputs <- suppressWarnings({
-    cffdrs::fwi(input = na.omit(FWIinputs),
+    cffdrs::fwi(input = FWIinputs,
                 init = na.omit(sim$FWIinit),
                 batch = FALSE, lat.adjust = TRUE)
   })
@@ -378,7 +379,7 @@ calcFBPProperties <- function(sim) {
   }
 
   FBPoutputs <- suppressWarnings({
-    cffdrs::fbp(input = na.omit(FBPinputs), output = "All")
+    cffdrs::fbp(input = FBPinputs, output = "All")
   })
   FBPoutputs <- data.table(FBPoutputs)
 
