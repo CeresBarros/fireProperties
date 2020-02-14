@@ -333,6 +333,7 @@ calcFBPProperties <- function(sim) {
 
   ## FWI ------------------------------
   ## make/update table of FWI inputs
+  browser()
   FWIinputs <- data.frame(id = sim$topoClimData$ID,
                           lat = sim$topoClimData$lat,
                           long = sim$topoClimData$long,
@@ -354,8 +355,7 @@ calcFBPProperties <- function(sim) {
   ## make inputs dataframe for FBI
   ## add fuel types and conifer dominance to FWIOutputs
   ## note that because climate/topo data is "larger" there are pixels that have no fuels - these are removed.
-  FWIoutputs <- FTs[FWIoutputs, on = "ID", nomatch = 0,
-                    allow.cartesian = TRUE]
+  FWIoutputs <- FTs[FWIoutputs, on = "ID", nomatch = 0]
 
   ## add slope and aspect
   ## again, only keep pixels that have fuels
