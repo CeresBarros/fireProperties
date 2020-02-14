@@ -314,6 +314,12 @@ calcFBPProperties <- function(sim) {
 
   FTs <- FTs[!is.na(FuelType)]
 
+  ## replace all D2s for D1s - cffdrs::fbp does not include D2
+  D1No <- unique(sim$ForestFuelTypes[FuelTypeFBP == "D2", FuelType]) - 1
+  FTs[FuelTypeFBP == "D2", `:=` (FuelTypeFBP = "D1",
+                                 FuelType = D1No)]
+
+
   ## check for duplicates (there shouldn't be any)
   if (getOption("LandR.assertions"))
     if (any(duplicated(FTs))) {
