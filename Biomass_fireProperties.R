@@ -477,49 +477,75 @@ calcFBPProperties <- function(sim) {
   ## note that some Climate NA data were multiplied by 10
   if (!suppliedElsewhere("temperatureRas", sim)) {
     ## get default temperature values, summer average
-    sim$temperatureRas <- Cache(prepInputs, targetFile = "Tave_sm.asc",
-                                url = extractURL("temperatureRas", sim),
-                                archive = "CanESM2_RCP45_r11i1p1_2011MSY.zip",
-                                alsoExtract = NA,
-                                destinationPath = dPath,
-                                fun = "raster",
-                                filename2 = FALSE,
-                                userTags = cacheTags)
-    sim$temperatureRas <- sim$temperatureRas/10  ## back transform temp values
+    temperatureRas <- Cache(prepInputs, targetFile = "Tave_sm.asc",
+                            url = extractURL("temperatureRas", sim),
+                            archive = "CanESM2_RCP45_r11i1p1_2011MSY.zip",
+                            alsoExtract = NA,
+                            destinationPath = dPath,
+                            fun = "raster",
+                            filename2 = FALSE,
+                            userTags = cacheTags)
+    temperatureRas <- temperatureRas/10  ## back transform temp values
 
     ## add the original CRS if it's not defined
-    if (is.na(crs(sim$temperatureRas)))
-      crs(sim$temperatureRas) <- "+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
+    if (is.na(crs(temperatureRas)))
+      crs(temperatureRas) <- "+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
+
+    sim$temperatureRas <- Cache(postProcess,
+                                x = temperatureRas,
+                                rasterToMatch = sim$rasterToMatch,
+                                maskWithRTM = TRUE,
+                                method = "bilinear",
+                                filename2 = FALSE,
+                                userTags = c(cacheTags, "temperatureRas"))
   }
 
   if (!suppliedElsewhere("precipitationRas", sim)) {
     ## get default precipitation values, summer cummulative precipitation
-    sim$precipitationRas <- Cache(prepInputs, targetFile = "PPT_sm.asc",
-                                  url = extractURL("precipitationRas", sim),
-                                  archive = "CanESM2_RCP45_r11i1p1_2011MSY.zip",
-                                  alsoExtract = NA,
-                                  destinationPath = dPath,
-                                  fun = "raster",
-                                  filename2 = FALSE,
-                                  userTags = cacheTags)
+    precipitationRas <- Cache(prepInputs, targetFile = "PPT_sm.asc",
+                              url = extractURL("precipitationRas", sim),
+                              archive = "CanESM2_RCP45_r11i1p1_2011MSY.zip",
+                              alsoExtract = NA,
+                              destinationPath = dPath,
+                              fun = "raster",
+                              filename2 = FALSE,
+                              userTags = cacheTags)
 
     ## add the original CRS if it's not defined
-    if (is.na(crs(sim$precipitationRas)))
-      crs(sim$precipitationRas) <- "+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
+    if (is.na(crs(precipitationRas)))
+      crs(precipitationRas) <- "+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
+
+    sim$precipitationRas <- Cache(postProcess,
+                                  x = precipitationRas,
+                                  rasterToMatch = sim$rasterToMatch,
+                                  maskWithRTM = TRUE,
+                                  method = "bilinear",
+                                  filename2 = FALSE,
+                                  userTags = c(cacheTags, "precipitationRas"))
   }
 
   if (!suppliedElsewhere("relativeHumRas", sim)) {
     ## get default precipitation values, summer average
-    sim$relativeHumRas <- Cache(prepInputs, targetFile = "RH_sm.asc",
-                                url = extractURL("relativeHumRas", sim),
-                                archive = "CanESM2_RCP45_r11i1p1_2011MSY.zip",
-                                alsoExtract = NA,
-                                destinationPath = dPath,
-                                fun = "raster",
+    relativeHumRas <- Cache(prepInputs, targetFile = "RH_sm.asc",
+                            url = extractURL("relativeHumRas", sim),
+                            archive = "CanESM2_RCP45_r11i1p1_2011MSY.zip",
+                            alsoExtract = NA,
+                            destinationPath = dPath,
+                            fun = "raster",
+                            filename2 = FALSE,
+                            userTags = cacheTags)
+
+    ## add the original CRS if it's not defined
+    if (is.na(crs(relativeHumRas)))
+      crs(relativeHumRas) <- "+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
+
+    sim$relativeHumRas <- Cache(postProcess,
+                                x = relativeHumRas,
+                                rasterToMatch = sim$rasterToMatch,
+                                maskWithRTM = TRUE,
+                                method = "bilinear",
                                 filename2 = FALSE,
-                                userTags = cacheTags)
-    if (is.na(crs(sim$relativeHumRas)))
-      crs(sim$relativeHumRas) <- "+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
+                                userTags = c(cacheTags, "relativeHumRas"))
   }
 
   if (!suppliedElsewhere("slopeRas", sim)) {
@@ -529,9 +555,12 @@ calcFBPProperties <- function(sim) {
                           archive = "DEM_Foothills_study_area.zip",
                           alsoExtract = NA,
                           destinationPath = getPaths()$inputPath,
+                          rasterToMatch = sim$rasterToMatch,
+                          maskWithRTM = TRUE,
+                          method = "bilinear",
                           datatype = "FLT4S",
                           filename2 = FALSE,
-                          userTags = cacheTags)
+                          userTags = c(cacheTags, "slopeRas"))
   }
 
   if (!suppliedElsewhere("aspectRas", sim)) {
@@ -540,9 +569,12 @@ calcFBPProperties <- function(sim) {
                            archive = "DEM_Foothills_study_area.zip",
                            alsoExtract = NA,
                            destinationPath = getPaths()$inputPath,
+                           rasterToMatch = sim$rasterToMatch,
+                           maskWithRTM = TRUE,
+                           method = "bilinear",
                            datatype = "FLT4S",
                            filename2 = FALSE,
-                           userTags = cacheTags)
+                           userTags = c(cacheTags, "aspectRas"))
   }
 
   ## FWI INITIALISATION DATAFRAME
