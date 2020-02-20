@@ -310,6 +310,14 @@ calcFBPProperties <- function(sim) {
            " Please debug Biomass_fireProperties calcFBPProperties() event function")
     }
 
+  ## check all pixel indices are part of RTM
+  if (getOption("LandR.assertions"))
+    if (!all(FTs$pixelIndex %in% which(!is.na(getValues(sim$rasterToMatch)))) &
+        !all(FTs$pixelIndex %in% sim$rasterToMatchFBPPoints$pixelIndex)) {
+      stop("Wrong pixel indices attributed to fuel types.\n",
+           "Please debug Biomass_fireProperties::calcFireProperties")
+    }
+
   ## FWI ------------------------------
   ## make/update table of FWI inputs
   FWIinputs <- data.frame(id = sim$topoClimData$ID,
@@ -320,6 +328,12 @@ calcFBPProperties <- function(sim) {
                           rh = sim$topoClimData$relHum,
                           ws = 0,
                           prec = sim$topoClimData$precip)
+
+  if (getOption("LandR.assertions"))
+    if (!all(FTs$pixelIndex %in% FWIinputs$id)) {
+      warning("Some pixels with fuels have no climate data.\n",
+              "Please debug Biomass_fireProperties::calcFireProperties")
+    }
 
   ## calculate FW indices
   FWIoutputs <- suppressWarnings({
@@ -333,6 +347,14 @@ calcFBPProperties <- function(sim) {
   ## make inputs dataframe for FBI
   ## add fuel types and conifer dominance to FWIOutputs
   ## note that because climate/topo data is "larger" there are pixels that have no fuels - these are removed.
+
+  ## check pixelIndex matches (there shouldn't be any)
+  if (getOption("LandR.assertions"))
+    if (!all(FTs$pixelIndex %in% FWIoutputs$ID)) {
+      warning("Some pixels with fuels have no fire weather indices.\n",
+              "Please debug Biomass_fireProperties::calcFireProperties")
+    }
+  setnames(FTs, "pixelIndex", "ID")
   FWIoutputs <- FTs[FWIoutputs, on = "ID", nomatch = 0]
 
   ## add slope and aspect
