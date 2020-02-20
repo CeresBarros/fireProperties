@@ -16,7 +16,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "Biomass_fireProperties.Rmd"),
   reqdPkgs = list("R.utils", "raster", "data.table", "dplyr",
-                  "sf", "cffdrs",
+                  "sp", "sf", "cffdrs",
                   "PredictiveEcology/LandR@development",
                   "PredictiveEcology/SpaDES.core@development",
                   "PredictiveEcology/SpaDES.tools@development",
@@ -168,72 +168,61 @@ firePropertiesInit <- function(sim) {
   ## define first fire year
   sim$fireYear <- as.integer(P(sim)$fireInitialTime)
 
-  ## project all inputs to Lat/Long (decimal degrees)
+  ## convert all inputs to Lat/Long (decimal degrees)
   ## for compatibility with FBP system
+  ## convert to points before projecting to avoid data loss.
 
-  ## buffer rasterToMatch to prevent data loss, using twice the pixel size and distance
-  ## then reproject to FBP compatible projection and mask buffer out (later)
+  ## convert rasterToMatch to spatial points and project
+  ## to prevent data loss
   ## note: don't mask to area until the end.
-  rasterToMatchFBP <- buffer(sim$rasterToMatch,
-                             width = res(sim$rasterToMatch)[1]*2)
-  rasterToMatchFBP <- projectRaster(rasterToMatchFBP, method = "ngb",
-                                    crs = crs(sim$studyAreaFBP))
+  rasterToMatchFBPPoints <- st_as_sf(rasterToPoints(sim$rasterToMatch, spatial = TRUE))
+  rasterToMatchFBPPoints$pixelIndex <- which(!is.na(getValues(sim$rasterToMatch)))
+  rasterToMatchFBPPoints <- st_transform(rasterToMatchFBPPoints, crs = crs(sim$studyAreaFBP))
 
   ## PROJECT CLIMATE/TOPO RASTERS
   message(blue("Processing climate data for fire weather and fuel calculation"))
-  sim$temperatureRas <- Cache(postProcess,
-                              x = sim$temperatureRas,
-                              rasterToMatch = rasterToMatchFBP,
-                              maskWithRTM = TRUE,
-                              method = "bilinear",
-                              filename2 = NULL,
-                              userTags = c(cacheTags, "topoClimRas"),
-                              omitArgs = c("userTags"))
-  sim$precipitationRas <- Cache(postProcess,
-                                x = sim$precipitationRas,
-                                rasterToMatch = rasterToMatchFBP,
-                                maskWithRTM = TRUE,
-                                method = "bilinear",
-                                filename2 = NULL,
-                                userTags = c(cacheTags, "topoClimRas"),
-                                omitArgs = c("userTags"))
-  sim$relativeHumRas <- Cache(postProcess,
-                              x = sim$relativeHumRas,
-                              rasterToMatch = rasterToMatchFBP,
-                              maskWithRTM = TRUE,
-                              method = "bilinear",
-                              filename2 = NULL,
-                              userTags = c(cacheTags, "topoClimRas"),
-                              omitArgs = c("userTags"))
-  sim$slopeRas <- Cache(postProcess,
-                        x = sim$slopeRas,
-                        rasterToMatch = rasterToMatchFBP,
-                        maskWithRTM = TRUE,
-                        method = "bilinear",
-                        filename2 = NULL,
-                        userTags = c(cacheTags, "topoClimRas"),
-                        omitArgs = c("userTags"))
-  sim$aspectRas <- Cache(postProcess,
-                         x = sim$aspectRas,
-                         rasterToMatch = rasterToMatchFBP,
-                         maskWithRTM = TRUE,
-                         method = "bilinear",
-                         filename2 = NULL,
-                         userTags = c(cacheTags, "topoClimRas"),
-                         omitArgs = c("userTags"))
+
+  temperaturePoints <- st_as_sf(rasterToPoints(sim$temperatureRas, spatial = TRUE))
+  temperaturePoints <- st_transform(temperaturePoints, crs = crs(sim$studyAreaFBP))
+
+  precipitationPoints <- st_as_sf(rasterToPoints(sim$precipitationRas, spatial = TRUE))
+  precipitationPoints <- st_transform(precipitationPoints, crs = crs(sim$studyAreaFBP))
+
+  relativeHumPoints <- st_as_sf(rasterToPoints(sim$relativeHumRas, spatial = TRUE))
+  relativeHumPoints <- st_transform(relativeHumPoints, crs = crs(sim$studyAreaFBP))
+
+  slopePoints <- st_as_sf(rasterToPoints(sim$slopeRas, spatial = TRUE))
+  slopePoints <- st_transform(slopePoints, crs = crs(sim$studyAreaFBP))
+
+  aspectPoints <- st_as_sf(rasterToPoints(sim$aspectRas, spatial = TRUE))
+  aspectPoints <- st_transform(aspectPoints, crs = crs(sim$studyAreaFBP))
+
+  if (getOption("LandR.assertions")) {
+    if (length(unique(c(crs(temperaturePoints), crs(precipitationPoints),
+                        crs(relativeHumPoints), crs(slopePoints),
+                        crs(aspectPoints), crs(rasterToMatchFBPPoints)))) > 1)
+      stop("Reprojecting climate data to FBP-compatible lat/long projection failed.\n
+             Please inspect Biomass_fireProperties::firePropertiesInit")
+
+    if (length(unique(c(nrow(temperaturePoints), nrow(precipitationPoints),
+                        nrow(relativeHumPoints), nrow(slopePoints),
+                        nrow(aspectPoints), nrow(rasterToMatchFBPPoints)))) > 1)
+      stop("Climate data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
+             Please inspect Biomass_fireProperties::firePropertiesInit")
+  }
 
   ## TOPOCLIMDATA TABLE ----------------------
   ## TODO: change to draw from fire weather distributions
   ## also this started erroring after adding module fireWeather
   browser()
-  topoClimData <- data.table(ID = seq_len(ncell(rasterToMatchFBP)),
-                             temp = getValues(sim$temperatureRas),
-                             precip = getValues(sim$precipitationRas),
-                             relHum = getValues(sim$relativeHumRas),
-                             slope = getValues(sim$slopeRas),
-                             aspect = getValues(sim$aspectRas),
-                             lat = coordinates(rasterToMatchFBP)[,2],
-                             long = coordinates(rasterToMatchFBP)[,1])
+  topoClimData <- data.table(ID = rasterToMatchFBPPoints$pixelIndex,
+                             temp = temperaturePoints[, 1, drop = TRUE],
+                             precip = precipitationPoints[, 1, drop = TRUE],
+                             relHum = relativeHumPoints[, 1, drop = TRUE],
+                             slope = slopePoints[, 1, drop = TRUE],
+                             aspect = aspectPoints[, 1, drop = TRUE],
+                             lat = st_coordinates(rasterToMatchFBPPoints)[,2],
+                             long = st_coordinates(rasterToMatchFBPPoints)[,1])
   topoClimData <- na.omit(topoClimData)
 
   ## this is no longer necessary as ClimateNA has relative humidity data
@@ -243,7 +232,8 @@ firePropertiesInit <- function(sim) {
   # topoClimData[, relHum := RH(t = topoClimData$temp, Td = runif (nrow(topoClimData), -3, 20), isK = FALSE)]
 
   ## export to sim
-  sim$rasterToMatchFBP <- rasterToMatchFBP
+  # sim$rasterToMatchFBP <- rasterToMatchFBP
+  sim$rasterToMatchFBPPoints <- rasterToMatchFBPPoints
   sim$topoClimData <- topoClimData
 
   return(invisible(sim))
@@ -252,54 +242,43 @@ firePropertiesInit <- function(sim) {
 ## Derive fire parameters from FBP system - rasters need to be in lat/long
 calcFBPProperties <- function(sim) {
   cacheTags <- c(currentModule(sim), "FBPPercParams")
-
   ## FUEL TYPES ------------------------------
-  ## reproject to fuelTypesMaps to FBP-compatible crs
-  fuelTypeRas <- Cache(postProcess,
-                       x = sim$fuelTypesMaps$finalFuelType,
-                       rasterToMatch = sim$rasterToMatchFBP,
-                       maskWithRTM = TRUE,
-                       method = "ngb",
-                       filename2 = NULL,
-                       userTags = c(cacheTags, "fuelTypeRas"),
-                       omitArgs = c("userTags"))
+  ## reproject to fuelTypesMaps to FBP-compatible this results in the loss of many pixels
+  ## so use spatial points for projection. pixelIDS need to be made into a column, since
+  ## there may be fewer points than in RTMFBPPoints
+  ## each object is then converted to a DT before joining
+  fuelTypePoints <- st_as_sf(rasterToPoints(sim$fuelTypesMaps$finalFuelType, spatial = TRUE))
+  fuelTypePoints$pixelIndex <- which(!is.na(getValues(sim$fuelTypesMaps$finalFuelType)))
+  fuelTypePoints <- st_transform(fuelTypePoints, crs = crs(sim$studyAreaFBP))
 
-  coniferDomRas <- Cache(postProcess,
-                         x = sim$fuelTypesMaps$coniferDom,
-                         rasterToMatch = sim$rasterToMatchFBP,
-                         maskWithRTM = TRUE,
-                         method = "bilinear",
-                         filename2 = NULL,
-                         userTags = c(cacheTags, "coniferDomRas"),
-                         omitArgs = c("userTags"))
+  coniferDomPoints <- st_as_sf(rasterToPoints(sim$fuelTypesMaps$coniferDom, spatial = TRUE))
+  coniferDomPoints$pixelIndex <- which(!is.na(getValues(sim$fuelTypesMaps$coniferDom)))
+  coniferDomPoints <- st_transform(coniferDomPoints, crs = crs(sim$studyAreaFBP))
 
-  if (!is.null(sim$pixelNonForestFuels)) {
-    curingRas <- Cache(postProcess,
-                       x = sim$fuelTypesMaps$curing,
-                       rasterToMatch = sim$rasterToMatchFBP,
-                       maskWithRTM = TRUE,
-                       method = "bilinear",
-                       filename2 = NULL,
-                       userTags = c(cacheTags, "curingRas"),
-                       omitArgs = c("userTags"))
-  } else {
-    ## post-process fails with a NA raster
-    curingRas <- cropInputs(sim$fuelTypesMaps$curing, rasterToMatch = sim$rasterToMatchFBP)
-    curingRas <- projectInputs(curingRas, rasterToMatch = sim$rasterToMatchFBP)
-    curingRas <- maskInputs(curingRas, rasterToMatch = sim$rasterToMatchFB0, maskWithRTM = TRUE)
+  curingPoints <- st_as_sf(rasterToPoints(sim$fuelTypesMaps$curing, spatial = TRUE))
+  curingPoints$pixelIndex <- which(!is.na(getValues(sim$fuelTypesMaps$curing)))
+  curingPoints <- st_transform(curingPoints, crs = crs(sim$studyAreaFBP))
 
-    if (getOption("LandR.assertions"))
-      if (!compareRaster(curingRas, sim$rasterToMatchFBP))
-        stop("Can't reproject NA curing raster to rasterToMatchFBP",
-             " Please debug Biomass_fireProperties calcFBPProperties() event function")
+  if (getOption("LandR.assertions")) {
+    if (length(unique(c(crs(fuelTypePoints), crs(coniferDomPoints),
+                        crs(curingPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
+      stop("Reprojecting climate data to FBP-compatible lat/long projection failed.\n
+             Please inspect Biomass_fireProperties::firePropertiesInit")
   }
 
+  fuelTypeDT <- as.data.table(st_drop_geometry(fuelTypePoints))
+  coniferDomDT <- as.data.table(st_drop_geometry(coniferDomPoints))
+  curingDT <- as.data.table(st_drop_geometry(curingPoints))
+  RTMpixelIndex <- data.table(pixelIndex = sim$rasterToMatchFBPPoints$pixelIndex)
 
-  ## make table of final fuel types
-  FTs <- data.table(ID = seq_len(ncell(sim$rasterToMatchFBP)),
-                    FuelType = getValues(fuelTypeRas),
-                    coniferDom = getValues(coniferDomRas),
-                    curing = getValues(curingRas))
+  ## make table of final fuel types by joining
+  FTs <- Reduce(function(x,y) merge.data.table(x, y, by = "pixelIndex", all = TRUE),
+                list(fuelTypeDT, coniferDomDT, curingDT, RTMpixelIndex))
+  setnames(FTs, old = names(FTs), new = c("pixelIndex", "FuelType", "coniferDom", "curing"))
+
+  ## remove pixels with no fuels
+  pixNoFuels <- FTs[is.na(FuelType) & is.na(coniferDom) & is.na(curing), pixelIndex]
+  FTs <- FTs[!pixelIndex %in% pixNoFuels]
 
   ## add FBP forest fuel type names
   FTs <- unique(sim$ForestFuelTypes[, .(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
@@ -333,7 +312,6 @@ calcFBPProperties <- function(sim) {
 
   ## FWI ------------------------------
   ## make/update table of FWI inputs
-  browser()
   FWIinputs <- data.frame(id = sim$topoClimData$ID,
                           lat = sim$topoClimData$lat,
                           long = sim$topoClimData$long,
