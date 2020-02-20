@@ -361,52 +361,26 @@ calcFBPProperties <- function(sim) {
   })
   FBPoutputs <- data.table(FBPoutputs)
 
-  ## FBP OUTPUTS TO SPATIALPOINTS
-  FBPOutputsPts <- FBPoutputs[, .(ID, CFB, ROS, RSO, HFI, TFC)]
-  FBPOutputsPts <- FBPOutputsPts[FWIoutputs[, .(ID, LAT, LONG)],
-                                 on = "ID", nomatch = 0][, ID := NULL]
-
-  FBPOutputsSf <- st_as_sf(FBPOutputsPts, coords = c("LONG", "LAT"),
-                           crs =  as.character(crs(sim$studyAreaFBP)),
-                           agr = "constant")
-
-  ## REPROJECT TO ORIGINAL CRS without data loss and convert to raster
-  ## note that after rasterizing it is safer to mask, in case some of
-  ## the buffer artefacts come through
-  FBPOutputsSf <- st_transform(FBPOutputsSf,
-                               crs = as.character(crs(sim$rasterToMatch)))
-  FBPOutputsPoly <- as_Spatial(FBPOutputsSf)
-
+  ## RASTERIZE FBP OUTPUTS BY PIXEL INDEX
   ## Crown fraction burnt
-  sim$fireCFBRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
-                              field = "CFB", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireCFBRas <- mask(sim$fireCFBRas, sim$rasterToMatch)
+  sim$fireCFBRas <- suppressWarnings(setValues(sim$rasterToMatch, rep(NA, ncell(sim$rasterToMatch))))
+  sim$fireCFBRas[FBPoutputs$ID] <- FBPoutputs$CFB
 
   ## Head fire intensity
-  sim$fireIntRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
-                              field = "HFI", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireIntRas <- mask(sim$fireIntRas, sim$rasterToMatch)
+  sim$fireIntRas <- suppressWarnings(setValues(sim$rasterToMatch, rep(NA, ncell(sim$rasterToMatch))))
+  sim$fireIntRas[FBPoutputs$ID] <- FBPoutputs$HFI
 
   ## Rate of spread
-  sim$fireROSRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
-                              field = "ROS", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireROSRas <- mask(sim$fireROSRas, sim$rasterToMatch)
+  sim$fireROSRas <- suppressWarnings(setValues(sim$rasterToMatch, rep(NA, ncell(sim$rasterToMatch))))
+  sim$fireROSRas[FBPoutputs$ID] <- FBPoutputs$ROS
 
   ## Critical spread rate for crowning
-  sim$fireRSORas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
-                              field = "RSO", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireRSORas <- mask(sim$fireRSORas, sim$rasterToMatch)
+  sim$fireRSORas <- suppressWarnings(setValues(sim$rasterToMatch, rep(NA, ncell(sim$rasterToMatch))))
+  sim$fireRSORas[FBPoutputs$ID] <- FBPoutputs$RSO
 
   ## Total fuel consumption
-  sim$fireTFCRas <- rasterize(FBPOutputsPoly, sim$rasterToMatch,
-                              field = "TFC", fun = function(x, na.rm = TRUE) max(x))
-  sim$fireTFCRas <- mask(sim$fireTFCRas, sim$rasterToMatch)
-
-  ## export to sim
-  # sim$FWIinputs <- FWIinputs
-  # sim$FWIoutputs <- FWIoutputs
-  # sim$FBPinputs <- FBPinputs
-  # sim$FBPoutputs <- FBPoutputs
+  sim$fireTFCRas <- suppressWarnings(setValues(sim$rasterToMatch, rep(NA, ncell(sim$rasterToMatch))))
+  sim$fireTFCRas[FBPoutputs$ID] <- FBPoutputs$TFC
 
   return(invisible(sim))
 }
