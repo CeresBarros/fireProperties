@@ -214,7 +214,7 @@ firePropertiesInit <- function(sim) {
   ## TOPOCLIMDATA TABLE ----------------------
   ## TODO: change to draw from fire weather distributions
   ## also this started erroring after adding module fireWeather
-  browser()
+  # browser()
   topoClimData <- data.table(ID = rasterToMatchFBPPoints$pixelIndex,
                              temp = temperaturePoints[, 1, drop = TRUE],
                              precip = precipitationPoints[, 1, drop = TRUE],
