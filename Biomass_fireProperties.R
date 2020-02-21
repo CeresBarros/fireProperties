@@ -221,7 +221,6 @@ firePropertiesInit <- function(sim) {
   # topoClimData[, relHum := RH(t = topoClimData$temp, Td = runif (nrow(topoClimData), -3, 20), isK = FALSE)]
 
   ## export to sim
-  # sim$rasterToMatchFBP <- rasterToMatchFBP
   sim$rasterToMatchFBPPoints <- rasterToMatchFBPPoints
   sim$topoClimData <- topoClimData
 
