@@ -16,7 +16,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "Biomass_fireProperties.Rmd"),
   reqdPkgs = list("R.utils", "raster", "data.table", "dplyr",
-                  "sp", "sf", "cffdrs",
+                  "sp", "sf", "cffdrs", "amc",
                   "PredictiveEcology/LandR@development",
                   "PredictiveEcology/SpaDES.core@development",
                   "PredictiveEcology/SpaDES.tools@development",
@@ -33,8 +33,6 @@ defineModule(sim, list(
                     desc = "use caching for the spinup simulation?")
   ),
   inputObjects = bind_rows(
-    expectsInput(objectName = "aspectRas", objectClass = "RasterLayer",
-                 desc = "Raster of aspect values - needs to be previously downloaded at this point"),
     expectsInput(objectName = "ForestFuelTypes", objectClass = "data.table",
                  desc = "Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code), their - or + contribution ('negSwitch'),
                  min and max age for each species"),
@@ -49,40 +47,43 @@ defineModule(sim, list(
                  desc = paste("Table of non forest fuel attributes (pixel ID, land cover, fuel type",
                               "name and code, and degree of curing) for each pixel with non-forest fuels.
                                Defaults to NULL, if not provided by another module")),
-    expectsInput(objectName = "precipitationRas", objectClass = "RasterLayer",
-                 desc = paste0("Raster of summer average precipitation values.",
-                               "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
-                 sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
     expectsInput("rasterToMatch", "RasterLayer",
                  desc = "a raster of the studyArea in the same resolution and projection as rawBiomassMap",
                  sourceURL = NA),
-    expectsInput(objectName = "relativeHumRas", objectClass = "RasterLayer",
-                 desc = paste0("Raster of summer average relative humidity values.",
-                               "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
-                 sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
-    expectsInput(objectName = "slopeRas", objectClass = "RasterLayer",
-                 desc = "Raster of slope values - needs to be previously downloaded at this point"),
+    expectsInput(objectName = "rasterToMatchFBPPoints", objectClass = "sf",
+                  desc = paste("the spatial points version of rasterToMatch reprojected",
+                               "to FBP-compatible lat/long projection:",
+                               "'+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'"),
+                 source = NA),
     expectsInput("studyArea", "SpatialPolygonsDataFrame",
                  desc = paste("Polygon to use as the study area.",
                               "Defaults to  an area in Southwestern Alberta, Canada."),
                  sourceURL = ""),
     expectsInput(objectName = "studyAreaFBP", objectClass = "SpatialPolygonsDataFrame",
-                 desc = "same as studyArea, but on FBP-compatible lat/long projection", sourceURL = ""),
-    expectsInput(objectName = "temperatureRas", objectClass = "RasterLayer",
-                 desc = paste0("Raster of summer average temperature values.",
-                               "Defaults data downloaded from Climate NA for 2011 using: CanESM2_RCP45_r11i1p1_2011MSY"),
+                 desc = paste("same as studyArea, but on FBP-compatible lat/long projection:",
+                              "'+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'"),
+                 sourceURL = ""),
+    expectsInput(objectName = "topoClimData", objectClass = "sf",
+                 desc = paste("Weather and topography point data, to be used to identify fire days.",
+                              "Needs to have the following columns: 'elevation', 'slope', 'aspect', 'month' (optional), 'day' (optional), 'temperature',",
+                              "'relativeHumidity', 'windSpeed' (optional), 'precipitation'. 'temperature' refers to average air temperature",
+                              "in Celsius, 'windSpeed' should be average wind speed (m/s) at 10m height, and 'precipitation' is",
+                              "total precipitation in mm. These data can be daily, monthly or yearly averages.",
+                              "Defaults to rasters of annual cliamte data downloaded from ClimateNA for 2011 using CanESM2_RCP45_r11i1p1_2011MSY",
+                              "and slope and aspect rasters derived from a DEM, all converted to point data."),
                  sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
-    expectsInput(objectName = "topoClimData", objectClass = "data.table",
-                 desc = "Climate data table with temperature, precipitation and relative humidity for each pixelGroup"),
-    expectsInput(objectName = "windSpeedRas", objectClass = "RasterLayer",
-                 desc = paste("Raster of daily mean wind speed at 10m (Jun-Aug). Defaults to a dummy raster of spatially",
-                              "constant wind speed of 8.5 km/h, which corresponds to the average dayly wind speed (Jun-Aug) calculated",
-                              "from Canada-US climate normals 1961-1990, using BioSIM"))
+    expectsInput(objectName = "topoClimDataCRS", objectClass = "character",
+                 desc = paste("The original projection of the climate data table. Must be supplied if",
+                              "topoClimData is supplied by the user or a module."))
   ),
   outputObjects = bind_rows(
     # createsOutput(objectName = "FBPinputs", objectClass = "RasterLayer",
     #               desc = "Fire behaviour prediction system inputs table"),
     # createsOutput(objectName = "FBPoutputs", objectClass = "list",
+    #               desc = "Fire weather outputs table"),
+    # createsOutput(objectName = "FWIinputs", objectClass = "RasterLayer",
+    #               desc = "Fire weather inputs table"),
+    # createsOutput(objectName = "FWIoutputs", objectClass = "list",
     #               desc = "Fire weather outputs table"),
     createsOutput(objectName = "fireCFBRas", objectClass = "RasterLayer",
                   desc = "Raster of crown fraction burnt"),
@@ -95,15 +96,6 @@ defineModule(sim, list(
     createsOutput(objectName = "fireTFCRas", objectClass = "RasterLayer",
                   desc = "Raster of total fuel consumed [kg/m^2]"),
     createsOutput(objectName = "fireYear", objectClass = "numeric", desc = "Next fire year"),
-    # createsOutput(objectName = "FWIinputs", objectClass = "RasterLayer",
-    #               desc = "Fire weather inputs table"),
-    # createsOutput(objectName = "FWIoutputs", objectClass = "list",
-    #               desc = "Fire weather outputs table"),
-    createsOutput(objectName = "rasterToMatchFBPPoints", objectClass = "sf",
-                  desc = paste("the spatial points version of rasterToMatch reprojected",
-                               "to FBP-compatible lat/long projection")),
-    createsOutput(objectName = "topoClimData", objectClass = "data.table",
-                  desc = "Climate data table with temperature, precipitation and relative humidity for each pixelGroup")
   )
 ))
 
@@ -157,72 +149,105 @@ firePropertiesInit <- function(sim) {
   ## define first fire year
   sim$fireYear <- as.integer(P(sim)$fireInitialTime)
 
-  ## convert all inputs to Lat/Long (decimal degrees)
-  ## for compatibility with FBP system
-  ## convert to points before projecting to avoid data loss.
+  ## MAKE FIRE WEATHER
+  ## check first if there's only one waether value per point
+  coords <- data.table(st_coordinates(sim$topoClimData))
+  coords <- unique(coords)
+  if (!nrow(coords) == nrow(sim$topoClimData)) {
+    ## METHOD 1 - AVERAGE ACROSS FIRE DAYS -----
+    if (P(sim)$fireWeatherMethod == "average") {
+      topoClimDataShort <- data.table(st_drop_geometry(sim$topoClimData))
 
-  ## convert rasterToMatch to spatial points and project
-  ## to prevent data loss
-  ## note: don't mask to area until the end.
-  rasterToMatchFBPPoints <- st_as_sf(rasterToPoints(sim$rasterToMatch, spatial = TRUE))
-  rasterToMatchFBPPoints$pixelIndex <- which(!is.na(getValues(sim$rasterToMatch)))
-  rasterToMatchFBPPoints <- st_transform(rasterToMatchFBPPoints, crs = crs(sim$studyAreaFBP))
+      ## add point IDS
+      topoClimDataShort[, `:=`(X = st_coordinates(sim$topoClimData)[,"X"],
+                             Y = st_coordinates(sim$topoClimData)[,"Y"])]
+      coords <- coords[, ID := 1:nrow(coords)]
+      topoClimDataShort <- coords[topoClimDataShort, on = .(X, Y)]
 
-  ## PROJECT CLIMATE/TOPO RASTERS
-  message(blue("Processing climate data for fire weather and fuel calculation"))
+      topoClimDataShort <- topoClimDataShort[, list(longitude = X,
+                                                latitude = Y,
+                                                elevation = elevation,
+                                                slope = slope,
+                                                aspect = aspect,
+                                                temperature = mean(temperature),
+                                                precipitation = mean(precipitation),
+                                                relativeHumidity = mean(relativeHumidity),
+                                                windSpeed = mean(windSpeed)),
+                                         by = ID] %>%
+        unique(.)
 
-  temperaturePoints <- st_as_sf(rasterToPoints(sim$temperatureRas, spatial = TRUE))
-  temperaturePoints <- st_transform(temperaturePoints, crs = crs(sim$studyAreaFBP))
+    }
 
-  precipitationPoints <- st_as_sf(rasterToPoints(sim$precipitationRas, spatial = TRUE))
-  precipitationPoints <- st_transform(precipitationPoints, crs = crs(sim$studyAreaFBP))
+    if (P(sim)$fireWeatherMethod == "sampleRnorm") {
+      ## METHOD 2 - SAMPLE FIRE DAYS RANDOMLY -----
+      ## (needs to be done once each fire year)
+      topoClimDataShort <- data.table(st_drop_geometry(sim$topoClimData))
 
-  relativeHumPoints <- st_as_sf(rasterToPoints(sim$relativeHumRas, spatial = TRUE))
-  relativeHumPoints <- st_transform(relativeHumPoints, crs = crs(sim$studyAreaFBP))
+      ## add point IDS
+      topoClimDataShort[, `:=`(X = st_coordinates(sim$topoClimData)[,"X"],
+                               Y = st_coordinates(sim$topoClimData)[,"Y"])]
+      coords <- coords[, ID := 1:nrow(coords)]
+      topoClimDataShort <- coords[topoClimDataShort, on = .(X, Y)]
 
-  slopePoints <- st_as_sf(rasterToPoints(sim$slopeRas, spatial = TRUE))
-  slopePoints <- st_transform(slopePoints, crs = crs(sim$studyAreaFBP))
+      ## this can result in NaNs for points with a single fire weather day
+      topoClimDataShort2 <- suppressWarnings({
+        topoClimDataShort[, list(longitude = X,
+                                 latitude = Y,
+                                 elevation = elevation,
+                                 slope = slope,
+                                 aspect = aspect,
+                                 temperature = rnorm(1, mean = mean(temperature), sd = sd(temperature)),
+                                 precipitation = rnorm(1, mean = mean(precipitation), sd = sd(precipitation)),
+                                 relativeHumidity = rnorm(1, mean = mean(relativeHumidity), sd = sd(relativeHumidity)),
+                                 windSpeed = rnorm(1, mean = mean(windSpeed), sd = sd(windSpeed))),
+                          by = ID] %>%
+          unique(.)
+      })
 
-  aspectPoints <- st_as_sf(rasterToPoints(sim$aspectRas, spatial = TRUE))
-  aspectPoints <- st_transform(aspectPoints, crs = crs(sim$studyAreaFBP))
+      naIDs <- topoClimDataShort2[is.na(temperature), ID]
+      cols <- names(topoClimDataShort2)
+      setnames(topoClimDataShort, old = c("X", "Y"),
+               new = c("longitude", "latitude"))
+      topoClimDataShort <- rbind(topoClimDataShort2[!ID %in% naIDs],
+                                  topoClimDataShort[ID %in% naIDs, ..cols], use.names = TRUE)
 
-  if (getOption("LandR.assertions")) {
-    if (length(unique(c(crs(temperaturePoints), crs(precipitationPoints),
-                        crs(relativeHumPoints), crs(slopePoints),
-                        crs(aspectPoints), crs(rasterToMatchFBPPoints)))) > 1)
-      stop("Reprojecting climate data to FBP-compatible lat/long projection failed.\n
-             Please inspect Biomass_fireProperties::firePropertiesInit")
+      rm(topoClimDataShort2)
+    }
 
-    if (length(unique(c(nrow(temperaturePoints), nrow(precipitationPoints),
-                        nrow(relativeHumPoints), nrow(slopePoints),
-                        nrow(aspectPoints), nrow(rasterToMatchFBPPoints)))) > 1)
-      stop("Climate data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
-             Please inspect Biomass_fireProperties::firePropertiesInit")
+    ## export to sim - don't replace topoClimData, because if samplingwe need the full data intact
+    sim$topoClimDataShort <- topoClimDataShort
+
+  } else {
+    message(blue("Only one weather value found per spatial point. No sampling or averaging of weather data will be done"))
+    sim$topoClimDataShort <- sim$topoClimData
   }
 
-  ## TOPOCLIMDATA TABLE ----------------------
-  ## TODO: change to draw from fire weather distributions
-  ## also this started erroring after adding module fireWeather
-  # browser()
-  topoClimData <- data.table(ID = rasterToMatchFBPPoints$pixelIndex,
-                             temp = temperaturePoints[, 1, drop = TRUE],
-                             precip = precipitationPoints[, 1, drop = TRUE],
-                             relHum = relativeHumPoints[, 1, drop = TRUE],
-                             slope = slopePoints[, 1, drop = TRUE],
-                             aspect = aspectPoints[, 1, drop = TRUE],
-                             lat = st_coordinates(rasterToMatchFBPPoints)[,2],
-                             long = st_coordinates(rasterToMatchFBPPoints)[,1])
-  topoClimData <- na.omit(topoClimData)
 
-  ## this is no longer necessary as ClimateNA has relative humidity data
-  ## relative humidity
-  ## using dew point between -3 and 20%, quarterly seasonal for Jun 2013
-  ## https://calgary.weatherstats.ca/metrics/dew_point.html
-  # topoClimData[, relHum := RH(t = topoClimData$temp, Td = runif (nrow(topoClimData), -3, 20), isK = FALSE)]
+  ## check if IDs match rasterToMatchFBPPoints (they may not, if data is supplied from user/another module)
+  ## if they dont, the data needs to be matched
+  if (!all(sim$topoClimData$ID %in% sim$rasterToMatchFBPPoints$pixelIndex)) {
+    ## TODO: CHECK PROJECTION
+    browser()
 
-  ## export to sim
-  sim$rasterToMatchFBPPoints <- rasterToMatchFBPPoints
-  sim$topoClimData <- topoClimData
+    message(blue("'topoClimData' does not conform to 'rasterToMatchFBPPoints'.",
+                 "Matching the two geographically"))
+    ## add a column of point ID
+    sim$topoClimData[, pointID := as.factor(paste(longitude, latitude, sep = "_"))]
+    sim$topoClimData[, pointID := as.numeric(pointID)]
+
+    ## make a points sf object
+    topoClimDataPoints <- unique(sim$topoClimData[, .(pointID, longitude, latitude)])
+    coordinates(topoClimDataPoints) <- c("longitude", "latitude")
+    topoClimDataPoints <- st_as_sf(topoClimDataPoints)
+    st_crs(topoClimDataPoints) <- sim$topoClimCRS
+
+    if (st_crs(topoClimDataPoints) != st_crs(sim$rasterToMatchFBPPoints)) {
+      message(blue("Projecting 'topoClimData points to rasterToMatchFBPPoints projection"))
+      topoClimDataPoints <- st_transform(topoClimDataPoints, crs = st_crs(rasterToMatchFBPPoints))
+    }
+
+  }
+
 
   return(invisible(sim))
 }
@@ -311,10 +336,10 @@ calcFBPProperties <- function(sim) {
   FWIinputs <- data.frame(id = sim$topoClimData$ID,
                           lat = sim$topoClimData$lat,
                           long = sim$topoClimData$long,
-                          mon = 7,  ## consider July.
+                          mon = sim$topoClimData$mon,  ## consider July.
                           temp = sim$topoClimData$temp,
                           rh = sim$topoClimData$relHum,
-                          ws = 0,
+                          ws = sim$topoClimData$ws,
                           prec = sim$topoClimData$precip)
 
   if (getOption("LandR.assertions"))
@@ -401,9 +426,7 @@ calcFBPProperties <- function(sim) {
   cacheTags = c(currentModule(sim), "function:.inputObjects")
 
   ## project to Lat/Long (decimal degrees) for compatibility with FBP system
-  ## TODO: this results in data loss - but LandR doesn't deal well with lat/long
-  ## need to find long term solution
-  latLong <- "+proj=longlat +datum=WGS84"
+  latLong <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
 
   if (!suppliedElsewhere("studyAreaFBP", sim)) {
     if (!suppliedElsewhere("studyArea", sim)) {
@@ -481,11 +504,25 @@ calcFBPProperties <- function(sim) {
     sim$studyArea <- fixErrors(sim$studyArea)
   }
 
+  ## convert all inputs to Lat/Long (decimal degrees)
+  ## for compatibility with FBP system
+  ## convert to points before projecting to avoid data loss.
+
+  ## convert rasterToMatch to spatial points and project
+  ## to prevent data loss
+  ## note: don't mask to area until the end.
+  sim$rasterToMatchFBPPoints <- st_as_sf(rasterToPoints(sim$rasterToMatch, spatial = TRUE))
+  sim$rasterToMatchFBPPoints$pixelIndex <- which(!is.na(getValues(sim$rasterToMatch)))
+  sim$rasterToMatchFBPPoints <- st_transform(sim$rasterToMatchFBPPoints, crs = crs(sim$studyAreaFBP))
+
   ## DEFAULT TOPO, TEMPERATURE AND PRECIPITATION
-  ## these defaults are only necessary if the rasters are not supplied by another module
+  ## these defaults are only necessary if topoClimData is not supplied by another module
   ## climate defaults to Climate NA Data, year 2011, RCP4.5
   ## note that some Climate NA data were multiplied by 10
-  if (!suppliedElsewhere("temperatureRas", sim)) {
+  if (!suppliedElsewhere("topoClimData", sim)) {
+
+    message(blue("Getting default 'temperatureRas' to make default 'topoClimData'.",
+                 "If this is not correct, make sure Biomass_fireProperties can detect 'topoClimData' is supplied"))
     ## get default temperature values, summer average
     temperatureRas <- Cache(prepInputs, targetFile = "Tave_sm.asc",
                             url = extractURL("temperatureRas", sim),
@@ -501,16 +538,16 @@ calcFBPProperties <- function(sim) {
     if (is.na(crs(temperatureRas)))
       crs(temperatureRas) <- "+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
 
-    sim$temperatureRas <- Cache(postProcess,
-                                x = temperatureRas,
-                                rasterToMatch = sim$rasterToMatch,
-                                maskWithRTM = TRUE,
-                                method = "bilinear",
-                                filename2 = FALSE,
-                                userTags = c(cacheTags, "temperatureRas"))
-  }
+    temperatureRas <- Cache(postProcess,
+                            x = temperatureRas,
+                            rasterToMatch = sim$rasterToMatch,
+                            maskWithRTM = TRUE,
+                            method = "bilinear",
+                            filename2 = FALSE,
+                            userTags = c(cacheTags, "temperatureRas"))
 
-  if (!suppliedElsewhere("precipitationRas", sim)) {
+    message(blue("Getting default 'precipitationRas' to make default 'topoClimData'.",
+                 "If this is not correct, make sure Biomass_fireProperties can detect 'topoClimData' is supplied"))
     ## get default precipitation values, summer cummulative precipitation
     precipitationRas <- Cache(prepInputs, targetFile = "PPT_sm.asc",
                               url = extractURL("precipitationRas", sim),
@@ -525,16 +562,16 @@ calcFBPProperties <- function(sim) {
     if (is.na(crs(precipitationRas)))
       crs(precipitationRas) <- "+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
 
-    sim$precipitationRas <- Cache(postProcess,
-                                  x = precipitationRas,
-                                  rasterToMatch = sim$rasterToMatch,
-                                  maskWithRTM = TRUE,
-                                  method = "bilinear",
-                                  filename2 = FALSE,
-                                  userTags = c(cacheTags, "precipitationRas"))
-  }
+    precipitationRas <- Cache(postProcess,
+                              x = precipitationRas,
+                              rasterToMatch = sim$rasterToMatch,
+                              maskWithRTM = TRUE,
+                              method = "bilinear",
+                              filename2 = FALSE,
+                              userTags = c(cacheTags, "precipitationRas"))
 
-  if (!suppliedElsewhere("relativeHumRas", sim)) {
+    message(blue("Getting default 'relativeHumRas' to make default 'topoClimData'.",
+                 "If this is not correct, make sure Biomass_fireProperties can detect 'topoClimData' is supplied"))
     ## get default precipitation values, summer average
     relativeHumRas <- Cache(prepInputs, targetFile = "RH_sm.asc",
                             url = extractURL("relativeHumRas", sim),
@@ -549,55 +586,119 @@ calcFBPProperties <- function(sim) {
     if (is.na(crs(relativeHumRas)))
       crs(relativeHumRas) <- "+init=epsg:4326 +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"
 
-    sim$relativeHumRas <- Cache(postProcess,
-                                x = relativeHumRas,
-                                rasterToMatch = sim$rasterToMatch,
-                                maskWithRTM = TRUE,
-                                method = "bilinear",
-                                filename2 = FALSE,
-                                userTags = c(cacheTags, "relativeHumRas"))
-  }
+    relativeHumRas <- Cache(postProcess,
+                            x = relativeHumRas,
+                            rasterToMatch = sim$rasterToMatch,
+                            maskWithRTM = TRUE,
+                            method = "bilinear",
+                            filename2 = FALSE,
+                            userTags = c(cacheTags, "relativeHumRas"))
 
-  if (!suppliedElsewhere("slopeRas", sim)) {
     ## TODO defaults of slope/aspect should cover whole of Canada
     ## get default slope values
-    sim$slopeRas <- Cache(prepInputs, targetFile = "dataset/SLOPE.tif",
-                          archive = "DEM_Foothills_study_area.zip",
-                          alsoExtract = NA,
-                          destinationPath = getPaths()$inputPath,
-                          rasterToMatch = sim$rasterToMatch,
-                          maskWithRTM = TRUE,
-                          method = "bilinear",
-                          datatype = "FLT4S",
-                          filename2 = FALSE,
-                          userTags = c(cacheTags, "slopeRas"))
-  }
+    slopeRas <- Cache(prepInputs, targetFile = "dataset/SLOPE.tif",
+                      archive = "DEM_Foothills_study_area.zip",
+                      alsoExtract = NA,
+                      destinationPath = getPaths()$inputPath,
+                      rasterToMatch = sim$rasterToMatch,
+                      maskWithRTM = TRUE,
+                      method = "bilinear",
+                      datatype = "FLT4S",
+                      filename2 = FALSE,
+                      userTags = c(cacheTags, "slopeRas"))
 
-  if (!suppliedElsewhere("aspectRas", sim)) {
     ## get default aspect values
-    sim$aspectRas <- Cache(prepInputs, targetFile = "dataset/ASPECT.tif",
-                           archive = "DEM_Foothills_study_area.zip",
-                           alsoExtract = NA,
-                           destinationPath = getPaths()$inputPath,
-                           rasterToMatch = sim$rasterToMatch,
-                           maskWithRTM = TRUE,
-                           method = "bilinear",
-                           datatype = "FLT4S",
-                           filename2 = FALSE,
-                           userTags = c(cacheTags, "aspectRas"))
+    aspectRas <- Cache(prepInputs, targetFile = "dataset/ASPECT.tif",
+                       archive = "DEM_Foothills_study_area.zip",
+                       alsoExtract = NA,
+                       destinationPath = getPaths()$inputPath,
+                       rasterToMatch = sim$rasterToMatch,
+                       maskWithRTM = TRUE,
+                       method = "bilinear",
+                       datatype = "FLT4S",
+                       filename2 = FALSE,
+                       userTags = c(cacheTags, "aspectRas"))
+
+    ## PROJECT CLIMATE/TOPO RASTERS AS POINTS
+    message(blue("Processing climate data for fire weather and fuel calculation"))
+    slopePoints <- st_as_sf(rasterToPoints(slopeRas, spatial = TRUE))
+    slopePoints <- st_transform(slopePoints, crs = crs(sim$studyAreaFBP))
+
+    aspectPoints <- st_as_sf(rasterToPoints(aspectRas, spatial = TRUE))
+    aspectPoints <- st_transform(aspectPoints, crs = crs(sim$studyAreaFBP))
+
+    temperaturePoints <- st_as_sf(rasterToPoints(temperatureRas, spatial = TRUE))
+    temperaturePoints <- st_transform(temperaturePoints, crs = crs(sim$studyAreaFBP))
+
+    precipitationPoints <- st_as_sf(rasterToPoints(precipitationRas, spatial = TRUE))
+    precipitationPoints <- st_transform(precipitationPoints, crs = crs(sim$studyAreaFBP))
+
+    relativeHumPoints <- st_as_sf(rasterToPoints(relativeHumRas, spatial = TRUE))
+    relativeHumPoints <- st_transform(relativeHumPoints, crs = crs(sim$studyAreaFBP))
+
+    if (getOption("LandR.assertions")) {
+      if (length(unique(c(crs(slopePoints), crs(aspectPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
+        stop("Reprojecting topography data to FBP-compatible lat/long projection failed.\n
+             Please inspect Biomass_fireProperties::firePropertiesInit")
+
+      if (length(unique(c(nrow(slopePoints), nrow(aspectPoints), nrow(sim$rasterToMatchFBPPoints)))) > 1)
+        stop("Topography data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
+             Please inspect Biomass_fireProperties::firePropertiesInit")
+
+      if (length(unique(c(crs(temperaturePoints), crs(precipitationPoints),
+                          crs(relativeHumPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
+        stop("Reprojecting climate data to FBP-compatible lat/long projection failed.\n
+             Please inspect Biomass_fireProperties::firePropertiesInit")
+
+      if (length(unique(c(nrow(temperaturePoints), nrow(precipitationPoints),
+                          nrow(relativeHumPoints), nrow(sim$rasterToMatchFBPPoints)))) > 1)
+        stop("Climate data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
+             Please inspect Biomass_fireProperties::firePropertiesInit")
+    }
+
+    message(blue(currentModule(sim), " is making 'topoClimData' from default temperature, precipitation and relative humidity raster layers"))
+    sim$topoClimDataCRS <- as.character(st_crs(sim$rasterToMatchFBPPoints))
+    topoClimData <- data.table(temperature = temperaturePoints[, 1, drop = TRUE],
+                               precipitation = precipitationPoints[, 1, drop = TRUE],
+                               relativeHumidity = relativeHumPoints[, 1, drop = TRUE],
+                               slope = slopePoints[, 1, drop = TRUE],
+                               aspect = aspectPoints[, 1, drop = TRUE],
+                               month = 7,  ## consider July.
+                               day = 1,
+                               windSpeed = 0, ## consider no wind
+                               latitude = st_coordinates(sim$rasterToMatchFBPPoints)[,2],
+                               longitude = st_coordinates(sim$rasterToMatchFBPPoints)[,1])
+    topoClimData <- na.omit(topoClimData)
+    topoClimData <- st_as_sf(topoClimData, coords = c("longitude", "latitude"),
+                             crs = sim$topoClimDataCRS, agr = "constant")
+
+
+    ## this is no longer necessary as ClimateNA has relative humidity data
+    ## relative humidity
+    ## using dew point between -3 and 20%, quarterly seasonal for Jun 2013
+    ## https://calgary.weatherstats.ca/metrics/dew_point.html
+    # topoClimData[, relHum := RH(t = topoClimData$temp, Td = runif (nrow(topoClimData), -3, 20), isK = FALSE)]
+
+    ## export to sim
+    sim$topoClimData <- topoClimData
   }
 
-  ## FWI INITIALISATION DATAFRAME
-  ## TODO:FWIinit should be updated every year from previous year's/days/months results
-  if (!suppliedElsewhere("FWIinit", sim)) {
-    sim$FWIinit = data.frame(ffmc = 85,
-                             dmc = 6,
-                             dc = 15)
-  }
+} else {
+  if (!suppliedElsewhere("topoClimDataCRS", sim))
+    stop(red("'topoClimData' appears to be supplied to Biomass_fireProperties,",
+             "but not topoClimDataCRS. Please make sure 'topoClimDataCRS' is also provided."))
+}
 
-  if(!suppliedElsewhere("pixelNonForestFuels", sim)) {
-    sim$pixelNonForestFuels <- NULL
-  }
 
-  return(invisible(sim))
+## FWI INITIALISATION DATAFRAME
+## TODO: FWIinit should be updated every year from previous year's/days/months results
+if (!suppliedElsewhere("FWIinit", sim)) {
+  sim$FWIinit <- data.frame(ffmc = 85, dmc = 6, dc = 15)
+}
+
+if(!suppliedElsewhere("pixelNonForestFuels", sim)) {
+  sim$pixelNonForestFuels <- NULL
+}
+
+return(invisible(sim))
 }
