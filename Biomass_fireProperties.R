@@ -22,6 +22,12 @@ defineModule(sim, list(
                   "PredictiveEcology/SpaDES.tools@development",
                   "PredictiveEcology/reproducible@development"),
   parameters = rbind(
+    defineParameter("fireWeatherMethod", "character", "sample", NA, NA,
+                    desc = paste("How fire weather is summarized by location. When 'topoClimData' contains",
+                                 "several fire weather observations (i.e. fire-days' weather values) per point,",
+                                 "they will be summarized by either calculating average fire-day weather per",
+                                 "location ('average'), or by sampling a fire-day ('sample'). If sampling,",
+                                 "at each fire year a new sample will be drawn. Defaults to 'average' for speed.")),
     defineParameter("vegFeedback", "logical", TRUE, NA, NA, desc = "Should vegetation feedbacks unto fire be simulated? Defaults to TRUE"),
     defineParameter(name = "fireInitialTime", class = "numeric", default = 2L,
                     desc = "The event time that the first fire disturbance event occurs"),
