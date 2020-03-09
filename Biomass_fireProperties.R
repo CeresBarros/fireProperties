@@ -57,9 +57,9 @@ defineModule(sim, list(
                  desc = "a raster of the studyArea in the same resolution and projection as rawBiomassMap",
                  sourceURL = NA),
     expectsInput(objectName = "rasterToMatchFBPPoints", objectClass = "sf",
-                  desc = paste("the spatial points version of rasterToMatch reprojected",
-                               "to FBP-compatible lat/long projection:",
-                               "'+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'"),
+                 desc = paste("the spatial points version of rasterToMatch reprojected",
+                              "to FBP-compatible lat/long projection:",
+                              "'+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'"),
                  source = NA),
     expectsInput("studyArea", "SpatialPolygonsDataFrame",
                  desc = paste("Polygon to use as the study area.",
@@ -166,25 +166,25 @@ firePropertiesInit <- function(sim) {
 
       ## add point IDS
       topoClimDataShort[, `:=`(X = st_coordinates(sim$topoClimData)[,"X"],
-                             Y = st_coordinates(sim$topoClimData)[,"Y"])]
+                               Y = st_coordinates(sim$topoClimData)[,"Y"])]
       coords <- coords[, ID := 1:nrow(coords)]
       topoClimDataShort <- coords[topoClimDataShort, on = .(X, Y)]
 
       topoClimDataShort <- topoClimDataShort[, list(longitude = X,
-                                                latitude = Y,
-                                                elevation = elevation,
-                                                slope = slope,
-                                                aspect = aspect,
-                                                temperature = mean(temperature),
-                                                precipitation = mean(precipitation),
-                                                relativeHumidity = mean(relativeHumidity),
-                                                windSpeed = mean(windSpeed)),
-                                         by = ID] %>%
+                                                    latitude = Y,
+                                                    elevation = elevation,
+                                                    slope = slope,
+                                                    aspect = aspect,
+                                                    temperature = mean(temperature),
+                                                    precipitation = mean(precipitation),
+                                                    relativeHumidity = mean(relativeHumidity),
+                                                    windSpeed = mean(windSpeed)),
+                                             by = ID] %>%
         unique(.)
 
     }
 
-    if (P(sim)$fireWeatherMethod == "sampleRnorm") {
+    if (P(sim)$fireWeatherMethod == "sample") {
       ## METHOD 2 - SAMPLE FIRE DAYS RANDOMLY -----
       ## (needs to be done once each fire year)
       topoClimDataShort <- data.table(st_drop_geometry(sim$topoClimData))
@@ -194,6 +194,8 @@ firePropertiesInit <- function(sim) {
                                Y = st_coordinates(sim$topoClimData)[,"Y"])]
       coords <- coords[, ID := 1:nrow(coords)]
       topoClimDataShort <- coords[topoClimDataShort, on = .(X, Y)]
+
+
 
       ## this can result in NaNs for points with a single fire weather day
       topoClimDataShort2 <- suppressWarnings({
@@ -215,7 +217,7 @@ firePropertiesInit <- function(sim) {
       setnames(topoClimDataShort, old = c("X", "Y"),
                new = c("longitude", "latitude"))
       topoClimDataShort <- rbind(topoClimDataShort2[!ID %in% naIDs],
-                                  topoClimDataShort[ID %in% naIDs, ..cols], use.names = TRUE)
+                                 topoClimDataShort[ID %in% naIDs, ..cols], use.names = TRUE)
 
       rm(topoClimDataShort2)
     }
@@ -526,7 +528,6 @@ calcFBPProperties <- function(sim) {
   ## climate defaults to Climate NA Data, year 2011, RCP4.5
   ## note that some Climate NA data were multiplied by 10
   if (!suppliedElsewhere("topoClimData", sim)) {
-
     message(blue("Getting default 'temperatureRas' to make default 'topoClimData'.",
                  "If this is not correct, make sure Biomass_fireProperties can detect 'topoClimData' is supplied"))
     ## get default temperature values, summer average
@@ -687,24 +688,23 @@ calcFBPProperties <- function(sim) {
 
     ## export to sim
     sim$topoClimData <- topoClimData
+
+  } else {
+    if (!suppliedElsewhere("topoClimDataCRS", sim))
+      stop(red("'topoClimData' appears to be supplied to Biomass_fireProperties,",
+               "but not topoClimDataCRS. Please make sure 'topoClimDataCRS' is also provided."))
   }
 
-} else {
-  if (!suppliedElsewhere("topoClimDataCRS", sim))
-    stop(red("'topoClimData' appears to be supplied to Biomass_fireProperties,",
-             "but not topoClimDataCRS. Please make sure 'topoClimDataCRS' is also provided."))
-}
 
+  ## FWI INITIALISATION DATAFRAME
+  ## TODO: FWIinit should be updated every year from previous year's/days/months results
+  if (!suppliedElsewhere("FWIinit", sim)) {
+    sim$FWIinit <- data.frame(ffmc = 85, dmc = 6, dc = 15)
+  }
 
-## FWI INITIALISATION DATAFRAME
-## TODO: FWIinit should be updated every year from previous year's/days/months results
-if (!suppliedElsewhere("FWIinit", sim)) {
-  sim$FWIinit <- data.frame(ffmc = 85, dmc = 6, dc = 15)
-}
+  if(!suppliedElsewhere("pixelNonForestFuels", sim)) {
+    sim$pixelNonForestFuels <- NULL
+  }
 
-if(!suppliedElsewhere("pixelNonForestFuels", sim)) {
-  sim$pixelNonForestFuels <- NULL
-}
-
-return(invisible(sim))
+  return(invisible(sim))
 }
