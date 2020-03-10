@@ -407,14 +407,15 @@ calcFBPProperties <- function(sim) {
 
   ## FWI ------------------------------
   ## make/update table of FWI inputs
-  FWIinputs <- data.frame(id = sim$topoClimData$ID,
-                          lat = sim$topoClimData$lat,
-                          long = sim$topoClimData$long,
-                          mon = sim$topoClimData$mon,  ## consider July.
-                          temp = sim$topoClimData$temp,
-                          rh = sim$topoClimData$relHum,
-                          ws = sim$topoClimData$ws,
-                          prec = sim$topoClimData$precip)
+  FWIinputs <- data.frame(id = sim$weatherDataShort$pixelIndex,
+                          lat = sim$weatherDataShort$latitude,
+                          long = sim$weatherDataShort$longitude,
+                          day = sim$weatherDataShort$day,
+                          mon = sim$weatherDataShort$month,
+                          temp = sim$weatherDataShort$temperature,
+                          rh = sim$weatherDataShort$relativeHumidity,
+                          ws = sim$weatherDataShort$windSpeed,
+                          prec = sim$weatherDataShort$precipitation)
 
   if (getOption("LandR.assertions"))
     if (!all(FTs$pixelIndex %in% FWIinputs$id)) {
@@ -446,8 +447,8 @@ calcFBPProperties <- function(sim) {
 
   ## add slope and aspect
   ## again, only keep pixels that have fuels
-  FWIoutputs <- sim$topoClimData[, .(ID, slope, aspect)][FWIoutputs, on = "ID", nomatch = 0]
-
+  FWIoutputs <- sim$weatherData[, .(ID, slope, aspect)][FWIoutputs, on = "ID", nomatch = 0]
+browser()
   FBPinputs <- data.frame(id = FWIoutputs$ID,
                           FuelType = FWIoutputs$FuelTypeFBP,
                           LAT = FWIoutputs$LAT,
@@ -589,13 +590,13 @@ calcFBPProperties <- function(sim) {
   sim$rasterToMatchFBPPoints$pixelIndex <- which(!is.na(getValues(sim$rasterToMatch)))
   sim$rasterToMatchFBPPoints <- st_transform(sim$rasterToMatchFBPPoints, crs = crs(sim$studyAreaFBP))
 
-  ## DEFAULT TOPO, TEMPERATURE AND PRECIPITATION
-  ## these defaults are only necessary if topoClimData is not supplied by another module
+  ## DEFAULT WEATHER DATA
+  ## these defaults are only necessary if weatherData is not supplied by another module
   ## climate defaults to Climate NA Data, year 2011, RCP4.5
   ## note that some Climate NA data were multiplied by 10
-  if (!suppliedElsewhere("topoClimData", sim)) {
-    message(blue("Getting default 'temperatureRas' to make default 'topoClimData'.",
-                 "If this is not correct, make sure Biomass_fireProperties can detect 'topoClimData' is supplied"))
+  if (!suppliedElsewhere("weatherData", sim)) {
+    message(blue("Getting default 'temperatureRas' to make default 'weatherData'.",
+                 "If this is not correct, make sure Biomass_fireProperties can detect 'weatherData' is supplied"))
     ## get default temperature values, summer average
     temperatureRas <- Cache(prepInputs, targetFile = "Tave_sm.asc",
                             url = extractURL("temperatureRas", sim),
@@ -619,8 +620,8 @@ calcFBPProperties <- function(sim) {
                             filename2 = FALSE,
                             userTags = c(cacheTags, "temperatureRas"))
 
-    message(blue("Getting default 'precipitationRas' to make default 'topoClimData'.",
-                 "If this is not correct, make sure Biomass_fireProperties can detect 'topoClimData' is supplied"))
+    message(blue("Getting default 'precipitationRas' to make default 'weatherData'.",
+                 "If this is not correct, make sure Biomass_fireProperties can detect 'weatherData' is supplied"))
     ## get default precipitation values, summer cummulative precipitation
     precipitationRas <- Cache(prepInputs, targetFile = "PPT_sm.asc",
                               url = extractURL("precipitationRas", sim),
@@ -643,8 +644,8 @@ calcFBPProperties <- function(sim) {
                               filename2 = FALSE,
                               userTags = c(cacheTags, "precipitationRas"))
 
-    message(blue("Getting default 'relativeHumRas' to make default 'topoClimData'.",
-                 "If this is not correct, make sure Biomass_fireProperties can detect 'topoClimData' is supplied"))
+    message(blue("Getting default 'relativeHumRas' to make default 'weatherData'.",
+                 "If this is not correct, make sure Biomass_fireProperties can detect 'weatherData' is supplied"))
     ## get default precipitation values, summer average
     relativeHumRas <- Cache(prepInputs, targetFile = "RH_sm.asc",
                             url = extractURL("relativeHumRas", sim),
@@ -729,36 +730,32 @@ calcFBPProperties <- function(sim) {
              Please inspect Biomass_fireProperties::firePropertiesInit")
     }
 
-    message(blue(currentModule(sim), " is making 'topoClimData' from default temperature, precipitation and relative humidity raster layers"))
-    sim$topoClimDataCRS <- as.character(st_crs(sim$rasterToMatchFBPPoints))
-    topoClimData <- data.table(temperature = temperaturePoints[, 1, drop = TRUE],
-                               precipitation = precipitationPoints[, 1, drop = TRUE],
-                               relativeHumidity = relativeHumPoints[, 1, drop = TRUE],
-                               slope = slopePoints[, 1, drop = TRUE],
-                               aspect = aspectPoints[, 1, drop = TRUE],
-                               month = 7,  ## consider July.
-                               day = 1,
-                               windSpeed = 0, ## consider no wind
-                               latitude = st_coordinates(sim$rasterToMatchFBPPoints)[,2],
-                               longitude = st_coordinates(sim$rasterToMatchFBPPoints)[,1])
-    topoClimData <- na.omit(topoClimData)
-    topoClimData <- st_as_sf(topoClimData, coords = c("longitude", "latitude"),
-                             crs = sim$topoClimDataCRS, agr = "constant")
-
+    message(blue(currentModule(sim), " is making 'weatherData' from default temperature, precipitation and relative humidity raster layers"))
+    sim$weatherDataCRS <- st_crs(sim$rasterToMatchFBPPoints)$proj4string
+    weatherData <- data.table(temperature = temperaturePoints[, 1, drop = TRUE],
+                              precipitation = precipitationPoints[, 1, drop = TRUE],
+                              relativeHumidity = relativeHumPoints[, 1, drop = TRUE],
+                              month = 7,  ## consider July.
+                              day = 1,
+                              windSpeed = 0, ## consider no wind
+                              latitude = st_coordinates(sim$rasterToMatchFBPPoints)[,2],
+                              longitude = st_coordinates(sim$rasterToMatchFBPPoints)[,1])
+    weatherData <- na.omit(weatherData)
+    weatherData <- st_as_sf(weatherData, coords = c("longitude", "latitude"),
+                            crs = sim$weatherDataCRS, agr = "constant")
 
     ## this is no longer necessary as ClimateNA has relative humidity data
     ## relative humidity
     ## using dew point between -3 and 20%, quarterly seasonal for Jun 2013
     ## https://calgary.weatherstats.ca/metrics/dew_point.html
-    # topoClimData[, relHum := RH(t = topoClimData$temp, Td = runif (nrow(topoClimData), -3, 20), isK = FALSE)]
+    # weatherData[, relHum := RH(t = weatherData$temp, Td = runif (nrow(weatherData), -3, 20), isK = FALSE)]
 
     ## export to sim
-    sim$topoClimData <- topoClimData
-
+    sim$weatherData <- weatherData
   } else {
-    if (!suppliedElsewhere("topoClimDataCRS", sim))
-      stop(red("'topoClimData' appears to be supplied to Biomass_fireProperties,",
-               "but not topoClimDataCRS. Please make sure 'topoClimDataCRS' is also provided."))
+    if (!suppliedElsewhere("weatherDataCRS", sim))
+      stop(red("'weatherData' appears to be supplied to Biomass_fireProperties,",
+               "but not weatherDataCRS. Please make sure 'weatherDataCRS' is also provided."))
   }
 
   ## DEM RASTER
