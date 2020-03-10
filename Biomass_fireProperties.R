@@ -291,6 +291,8 @@ firePropertiesInit <- function(sim) {
   weatherDataShort <- sim$weatherDataShort
   weatherDataShort <- st_transform(weatherDataShort, crs = st_crs(sim$rasterToMatch))
 
+  browser()
+  ## TODO: add month day
   ## inverse-distance weighted interpolation - only for climate variables
   fields <- c("precipitation", "temperature", "windSpeed", "relativeHumidity")
   weatherDataIDWList <- lapply(fields, FUN = function(x) {
@@ -422,6 +424,7 @@ calcFBPProperties <- function(sim) {
 
   ## FWI ------------------------------
   ## make/update table of FWI inputs
+  browser()
   FWIinputs <- data.frame(id = sim$weatherDataShort$pixelIndex,
                           lat = sim$weatherDataShort$latitude,
                           long = sim$weatherDataShort$longitude,
