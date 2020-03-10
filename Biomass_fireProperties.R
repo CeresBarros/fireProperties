@@ -269,32 +269,55 @@ firePropertiesInit <- function(sim) {
     sim$weatherDataShort <- sim$weatherData
   }
 
+  ## INTERPOLATE WEATHER TO RASTERTOMATCH AND RE-MAKE SHORT WEATHER TABLE
+  ## to avoid data losses all re-projections need to be made in vector format:
+  ## 1. re-project points to match original RTM crs
+  ## 2. interpolate using points
+  ## 3. make a table using pixIDs
+  ## 4. add coordinates
+  message(blue("Interpolating weather data for extraction of weather values for each simulated pixel"))
+  weatherDataShort <- sim$weatherDataShort
+  weatherDataShort <- st_transform(weatherDataShort, crs = st_crs(sim$rasterToMatch))
 
-  ## check if IDs match rasterToMatchFBPPoints (they may not, if data is supplied from user/another module)
-  ## if they dont, the data needs to be matched
-  if (!all(sim$topoClimData$ID %in% sim$rasterToMatchFBPPoints$pixelIndex)) {
-    ## TODO: CHECK PROJECTION
-    browser()
+  ## inverse-distance weighted interpolation - only for climate variables
+  fields <- c("precipitation", "temperature", "windSpeed", "relativeHumidity")
+  weatherDataIDWList <- lapply(fields, FUN = function(x) {
+    form <- as.formula(paste(x, "~ 1"))
+    interpModel <- gstat(formula = form, locations = weatherDataShort)   ## get interpolation model from points
+    weatherDataIDWRas <- interpolate(object = sim$rasterToMatch, model = interpModel)  ## interpolate on RTM
+    mask(weatherDataIDWRas, sim$rasterToMatch)
+  })
 
-    message(blue("'topoClimData' does not conform to 'rasterToMatchFBPPoints'.",
-                 "Matching the two geographically"))
-    ## add a column of point ID
-    sim$topoClimData[, pointID := as.factor(paste(longitude, latitude, sep = "_"))]
-    sim$topoClimData[, pointID := as.numeric(pointID)]
+  names(weatherDataIDWList) <- fields
 
-    ## make a points sf object
-    topoClimDataPoints <- unique(sim$topoClimData[, .(pointID, longitude, latitude)])
-    coordinates(topoClimDataPoints) <- c("longitude", "latitude")
-    topoClimDataPoints <- st_as_sf(topoClimDataPoints)
-    st_crs(topoClimDataPoints) <- sim$topoClimCRS
+  weatherDataIDWPointsList <- lapply(weatherDataIDWList, FUN = function(x) {
+    x <- st_as_sf(rasterToPoints(x, spatial = TRUE))
+    x$pixelIndex <- which(!is.na(getValues(sim$rasterToMatch)))
+    x <- st_transform(x, crs = crs(sim$studyAreaFBP))
+    x
+  })
 
-    if (st_crs(topoClimDataPoints) != st_crs(sim$rasterToMatchFBPPoints)) {
-      message(blue("Projecting 'topoClimData points to rasterToMatchFBPPoints projection"))
-      topoClimDataPoints <- st_transform(topoClimDataPoints, crs = st_crs(rasterToMatchFBPPoints))
-    }
+  names(weatherDataIDWPointsList) <- fields
 
+  weatherDataShort2 <- data.table(pixelIndex = st_drop_geometry(sim$rasterToMatchFBPPoints)$pixelIndex,
+                                  longitude = st_coordinates(sim$rasterToMatchFBPPoints)[, "X"],
+                                  latitude = st_coordinates(sim$rasterToMatchFBPPoints)[, "Y"])
+  weatherDataShort3 <- data.table(pixelIndex = weatherDataIDWPointsList$precipitation$pixelIndex,
+                                  precipitation = weatherDataIDWPointsList$precipitation$var1.pred,
+                                  temperature = weatherDataIDWPointsList$temperature$var1.pred,
+                                  windSpeed = weatherDataIDWPointsList$windSpeed$var1.pred,
+                                  relativeHumidity = weatherDataIDWPointsList$relativeHumidity$var1.pred)
+
+  ## join and make sure no pixels were lost
+  weatherDataShort3 <- weatherDataShort3[weatherDataShort2, on = .(pixelIndex)]
+
+  if (getOption("LandR.assertions")) {
+    if (nrow(weatherDataShort2) != nrow(weatherDataShort3))
+      stop("Some pixels have no weather data")
   }
 
+  ## export to sim
+  sim$weatherDataShort <- weatherDataShort3
 
   return(invisible(sim))
 }
