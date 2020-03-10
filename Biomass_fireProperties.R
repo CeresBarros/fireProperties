@@ -158,12 +158,16 @@ doEvent.Biomass_fireProperties = function(sim, eventTime, eventType, debug = FAL
 
 ### module initialization
 firePropertiesInit <- function(sim) {
+  message(blue("Processing climate data for fire weather and fuel calculation"))
   cacheTags <- c(currentModule(sim), "firePropertiesInit")
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
 
   ## checks
   if (start(sim) == P(sim)$fireInitialTime)
     warning(red("start(sim) and P(sim)$fireInitialTime are the same.\nThis may create bad scheduling with init events"))
+
+  if (!P(sim)$fireWeatherMethod %in% c("average", "sample"))
+    stop("'fireWeatherMethod'can only be of type 'average' or 'sample'.")
 
   ## define first fire year
   sim$fireYear <- as.integer(P(sim)$fireInitialTime)
@@ -333,6 +337,13 @@ firePropertiesInit <- function(sim) {
 ## Derive fire parameters from FBP system - rasters need to be in lat/long
 calcFBPProperties <- function(sim) {
   cacheTags <- c(currentModule(sim), "FBPPercParams")
+
+  if (getOption("LandR.assertions")) {
+    if (length(unique(c(ncell(sim$fuelTypesMaps$finalFuelType), ncell(sim$fuelTypesMaps$coniferDom),
+                        ncell(sim$fuelTypesMaps$curing), ncell(sim$rasterToMatch)))) > 1)
+      stop("One or more 'fuelTypesMaps' rasters have different number of cells from 'rasterToMatch'")
+  }
+
   ## FUEL TYPES ------------------------------
   ## reproject to fuelTypesMaps to FBP-compatible this results in the loss of many pixels
   ## so use spatial points for projection. pixelIDS need to be made into a column, since
