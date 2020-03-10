@@ -23,7 +23,7 @@ defineModule(sim, list(
                   "PredictiveEcology/reproducible@development"),
   parameters = rbind(
     defineParameter("fireWeatherMethod", "character", "sample", NA, NA,
-                    desc = paste("How fire weather is summarized by location. When 'topoClimData' contains",
+                    desc = paste("How fire weather is summarized by location. When 'weatherData' contains",
                                  "several fire weather observations (i.e. fire-days' weather values) per point,",
                                  "they will be summarized by either calculating average fire-day weather per",
                                  "location ('average'), or by sampling a fire-day ('sample'). If sampling,",
@@ -69,18 +69,17 @@ defineModule(sim, list(
                  desc = paste("same as studyArea, but on FBP-compatible lat/long projection:",
                               "'+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'"),
                  sourceURL = ""),
-    expectsInput(objectName = "topoClimData", objectClass = "sf",
-                 desc = paste("Weather and topography point data, to be used to identify fire days.",
-                              "Needs to have the following columns: 'elevation', 'slope', 'aspect', 'month' (optional), 'day' (optional), 'temperature',",
+    expectsInput(objectName = "weatherData", objectClass = "sf",
+                 desc = paste("Weather point data, to be used to identify fire days.",
+                              "Needs to have the following columns: 'month' (optional), 'day' (optional), 'temperature',",
                               "'relativeHumidity', 'windSpeed' (optional), 'precipitation'. 'temperature' refers to average air temperature",
                               "in Celsius, 'windSpeed' should be average wind speed (m/s) at 10m height, and 'precipitation' is",
                               "total precipitation in mm. These data can be daily, monthly or yearly averages.",
-                              "Defaults to rasters of annual cliamte data downloaded from ClimateNA for 2011 using CanESM2_RCP45_r11i1p1_2011MSY",
-                              "and slope and aspect rasters derived from a DEM, all converted to point data."),
+                              "Defaults to rasters of annual climate data downloaded from ClimateNA for 2011 using CanESM2_RCP45_r11i1p1_2011MSY"),
                  sourceURL = "https://drive.google.com/open?id=12iNnl3P7VjisVKC0vatSrXyhYtl6w-D1"),
-    expectsInput(objectName = "topoClimDataCRS", objectClass = "character",
+    expectsInput(objectName = "weatherDataCRS", objectClass = "character",
                  desc = paste("The original projection of the climate data table. Must be supplied if",
-                              "topoClimData is supplied by the user or a module."))
+                              "weatherData is supplied by the user or a module."))
   ),
   outputObjects = bind_rows(
     # createsOutput(objectName = "FBPinputs", objectClass = "RasterLayer",
@@ -102,6 +101,12 @@ defineModule(sim, list(
     createsOutput(objectName = "fireTFCRas", objectClass = "RasterLayer",
                   desc = "Raster of total fuel consumed [kg/m^2]"),
     createsOutput(objectName = "fireYear", objectClass = "numeric", desc = "Next fire year"),
+    createsOutput(objectName = "weatherDataShort", objectClass = "sf",
+                 desc = paste("Weather point data summarized according to 'fireWeatherMethod', by pixelIndex",
+                              "and on FBP compatible projection")),
+    createsOutput(objectName = "topoData", objectClass = "data.table",
+                  desc = paste("Table with slope and aspect values extracted from 'DEMRas', by pixelIndex",
+                               "and on FBP compatible projection")),
   )
 ))
 
@@ -155,11 +160,54 @@ firePropertiesInit <- function(sim) {
   ## define first fire year
   sim$fireYear <- as.integer(P(sim)$fireInitialTime)
 
-  ## MAKE FIRE WEATHER
-  ## check first if there's only one waether value per point
-  coords <- data.table(st_coordinates(sim$topoClimData))
+  ## MAKE TOPO DATA ------------------------------------------
+  ## extract slope and aspect from DEM raster - assume NAs are 0s to remove border effect
+  DEMRas <- sim$DEMRas
+  DEMRas[is.na(DEMRas)] <- 0
+  tempBrick <- terrain(DEMRas, opt = c("slope", "aspect"))
+  tempBrick <- mask(tempBrick, sim$DEMRas)
+  slopeRas <- tempBrick$slope
+  aspectRas <- tempBrick$aspect
+  rm(tempBrick, DEMRas);
+  .gc()
+
+  ## make points and reproject
+  slopePoints <- st_as_sf(rasterToPoints(slopeRas, spatial = TRUE))
+  slopePoints <- st_transform(slopePoints, crs = crs(sim$studyAreaFBP))
+  aspectPoints <- st_as_sf(rasterToPoints(aspectRas, spatial = TRUE))
+  aspectPoints <- st_transform(aspectPoints, crs = crs(sim$studyAreaFBP))
+
+  ## join to get IDs
+  slopePoints <- st_join(slopePoints, sim$rasterToMatchFBPPoints,
+                         join = st_nearest_feature)
+  aspectPoints <- st_join(aspectPoints, sim$rasterToMatchFBPPoints,
+                          join = st_nearest_feature)
+  slopePoints$rasterToMatch <- NULL
+  aspectPoints$rasterToMatch <- NULL
+
+  ## make a table
+  sim$topoData <- data.table(pixelIndex = slopePoints$pixelIndex,
+                             longitude = st_coordinates(slopePoints)[,"X"],
+                             latitude = st_coordinates(slopePoints)[,"Y"],
+                             slope = slopePoints$slope,
+                             aspect = aspectPoints$aspect)
+
+  ## check that the number of points matches
+  if (getOption("LandR.assertions")) {
+    if (length(unique(c(crs(slopePoints), crs(aspectPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
+      stop("Reprojecting topography data to FBP-compatible lat/long projection failed.\n
+             Please inspect Biomass_fireProperties::firePropertiesInit")
+
+    if (length(unique(c(nrow(slopePoints), nrow(aspectPoints), nrow(sim$rasterToMatchFBPPoints)))) > 1)
+      stop("Topography data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
+             Please inspect Biomass_fireProperties::firePropertiesInit")
+  }
+
+  ## MAKE FIRE WEATHER --------------------------------------
+  ## check first if there's only one weather value per point
+  coords <- data.table(st_coordinates(sim$weatherData))
   coords <- unique(coords)
-  if (!nrow(coords) == nrow(sim$topoClimData)) {
+  if (!nrow(coords) == nrow(sim$weatherData)) {
     ## METHOD 1 - AVERAGE ACROSS FIRE DAYS -----
     if (P(sim)$fireWeatherMethod == "average") {
       topoClimDataShort <- data.table(st_drop_geometry(sim$topoClimData))
@@ -222,12 +270,16 @@ firePropertiesInit <- function(sim) {
       rm(topoClimDataShort2)
     }
 
-    ## export to sim - don't replace topoClimData, because if samplingwe need the full data intact
-    sim$topoClimDataShort <- topoClimDataShort
-
+    ## first convert to sf
+    weatherDataShort <- st_as_sf(weatherDataShort, coords = c("longitude", "latitude"),
+                                 crs = sim$weatherDataCRS, agr = "constant")
+    ## export to sim - don't replace weatherData - if sampling we need the full data intact
+    sim$weatherDataShort <- weatherDataShort
+    rm(weatherDataShort)
+    .gc()
   } else {
     message(blue("Only one weather value found per spatial point. No sampling or averaging of weather data will be done"))
-    sim$topoClimDataShort <- sim$topoClimData
+    sim$weatherDataShort <- sim$weatherData
   }
 
 
