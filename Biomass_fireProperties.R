@@ -243,31 +243,18 @@ firePropertiesInit <- function(sim) {
       coords <- coords[, ID := 1:nrow(coords)]
       weatherDataShort <- coords[weatherDataShort, on = .(X, Y)]
 
-
-
-      ## this can result in NaNs for points with a single fire weather day
-      topoClimDataShort2 <- suppressWarnings({
-        topoClimDataShort[, list(longitude = X,
-                                 latitude = Y,
-                                 elevation = elevation,
-                                 slope = slope,
-                                 aspect = aspect,
-                                 temperature = rnorm(1, mean = mean(temperature), sd = sd(temperature)),
-                                 precipitation = rnorm(1, mean = mean(precipitation), sd = sd(precipitation)),
-                                 relativeHumidity = rnorm(1, mean = mean(relativeHumidity), sd = sd(relativeHumidity)),
-                                 windSpeed = rnorm(1, mean = mean(windSpeed), sd = sd(windSpeed))),
-                          by = ID] %>%
-          unique(.)
-      })
-
-      naIDs <- topoClimDataShort2[is.na(temperature), ID]
-      cols <- names(topoClimDataShort2)
-      setnames(topoClimDataShort, old = c("X", "Y"),
-               new = c("longitude", "latitude"))
-      topoClimDataShort <- rbind(topoClimDataShort2[!ID %in% naIDs],
-                                 topoClimDataShort[ID %in% naIDs, ..cols], use.names = TRUE)
-
-      rm(topoClimDataShort2)
+      ## sample a fire day per point
+      weatherDataShort[, sampDay := sample(1:length(.I), 1), by = ID]
+      weatherDataShort <- weatherDataShort[, list(longitude = X[sampDay],
+                                                  latitude = Y[sampDay],
+                                                  month = month[sampDay],
+                                                  day = day[sampDay],
+                                                  temperature = temperature[sampDay],
+                                                  precipitation = precipitation[sampDay],
+                                                  relativeHumidity = relativeHumidity[sampDay],
+                                                  windSpeed = windSpeed[sampDay]),
+                                           by = ID] %>%
+        unique(.)
     }
 
     ## first convert to sf
