@@ -16,7 +16,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "Biomass_fireProperties.Rmd"),
   reqdPkgs = list("R.utils", "raster", "data.table", "dplyr",
-                  "sp", "sf", "cffdrs", "amc",
+                  "sp", "sf", "cffdrs", "amc", "fasterize", "gstat",
                   "PredictiveEcology/LandR@development",
                   "PredictiveEcology/SpaDES.core@development",
                   "PredictiveEcology/SpaDES.tools@development",
