@@ -210,38 +210,38 @@ firePropertiesInit <- function(sim) {
   if (!nrow(coords) == nrow(sim$weatherData)) {
     ## METHOD 1 - AVERAGE ACROSS FIRE DAYS -----
     if (P(sim)$fireWeatherMethod == "average") {
-      topoClimDataShort <- data.table(st_drop_geometry(sim$topoClimData))
+      message(blue("Calculating average weather data per point in 'weatherData'"))
+      weatherDataShort <- data.table(st_drop_geometry(sim$weatherData))
 
       ## add point IDS
-      topoClimDataShort[, `:=`(X = st_coordinates(sim$topoClimData)[,"X"],
-                               Y = st_coordinates(sim$topoClimData)[,"Y"])]
+      weatherDataShort[, `:=`(X = st_coordinates(sim$weatherData)[,"X"],
+                              Y = st_coordinates(sim$weatherData)[,"Y"])]
       coords <- coords[, ID := 1:nrow(coords)]
-      topoClimDataShort <- coords[topoClimDataShort, on = .(X, Y)]
+      weatherDataShort <- coords[weatherDataShort, on = .(X, Y)]
 
-      topoClimDataShort <- topoClimDataShort[, list(longitude = X,
-                                                    latitude = Y,
-                                                    elevation = elevation,
-                                                    slope = slope,
-                                                    aspect = aspect,
-                                                    temperature = mean(temperature),
-                                                    precipitation = mean(precipitation),
-                                                    relativeHumidity = mean(relativeHumidity),
-                                                    windSpeed = mean(windSpeed)),
-                                             by = ID] %>%
+      weatherDataShort <- weatherDataShort[, list(longitude = X,
+                                                  latitude = Y,
+                                                  month = round(mean(month)),
+                                                  day = round(mean(day)),
+                                                  temperature = mean(temperature),
+                                                  precipitation = mean(precipitation),
+                                                  relativeHumidity = mean(relativeHumidity),
+                                                  windSpeed = mean(windSpeed)),
+                                           by = ID] %>%
         unique(.)
-
     }
 
     if (P(sim)$fireWeatherMethod == "sample") {
       ## METHOD 2 - SAMPLE FIRE DAYS RANDOMLY -----
       ## (needs to be done once each fire year)
-      topoClimDataShort <- data.table(st_drop_geometry(sim$topoClimData))
+      message(blue("Sampling weather data (one fire day) per point in 'weatherData'"))
+      weatherDataShort <- data.table(st_drop_geometry(sim$weatherData))
 
       ## add point IDS
-      topoClimDataShort[, `:=`(X = st_coordinates(sim$topoClimData)[,"X"],
-                               Y = st_coordinates(sim$topoClimData)[,"Y"])]
+      weatherDataShort[, `:=`(X = st_coordinates(sim$weatherData)[,"X"],
+                              Y = st_coordinates(sim$weatherData)[,"Y"])]
       coords <- coords[, ID := 1:nrow(coords)]
-      topoClimDataShort <- coords[topoClimDataShort, on = .(X, Y)]
+      weatherDataShort <- coords[weatherDataShort, on = .(X, Y)]
 
 
 
