@@ -94,6 +94,10 @@ defineModule(sim, list(
     #               desc = "Fire weather inputs table"),
     # createsOutput(objectName = "FWIoutputs", objectClass = "list",
     #               desc = "Fire weather outputs table"),
+    # createsOutput(objectName = "aspectRas", objectClass = "RasterLayer",
+    #               desc = "Raster of aspect values extracted from 'DEMRas'"),
+    # createsOutput(objectName = "slopeRas", objectClass = "RasterLayer",
+    #               desc = "Raster of slope values extracted from 'DEMRas'")
     createsOutput(objectName = "fireCFBRas", objectClass = "RasterLayer",
                   desc = "Raster of crown fraction burnt"),
     createsOutput(objectName = "fireIntRas", objectClass = "RasterLayer",
@@ -668,39 +672,7 @@ browser()
                             filename2 = FALSE,
                             userTags = c(cacheTags, "relativeHumRas"))
 
-    ## TODO defaults of slope/aspect should cover whole of Canada
-    ## get default slope values
-    slopeRas <- Cache(prepInputs, targetFile = "dataset/SLOPE.tif",
-                      archive = "DEM_Foothills_study_area.zip",
-                      alsoExtract = NA,
-                      destinationPath = getPaths()$inputPath,
-                      rasterToMatch = sim$rasterToMatch,
-                      maskWithRTM = TRUE,
-                      method = "bilinear",
-                      datatype = "FLT4S",
-                      filename2 = FALSE,
-                      userTags = c(cacheTags, "slopeRas"))
-
-    ## get default aspect values
-    aspectRas <- Cache(prepInputs, targetFile = "dataset/ASPECT.tif",
-                       archive = "DEM_Foothills_study_area.zip",
-                       alsoExtract = NA,
-                       destinationPath = getPaths()$inputPath,
-                       rasterToMatch = sim$rasterToMatch,
-                       maskWithRTM = TRUE,
-                       method = "bilinear",
-                       datatype = "FLT4S",
-                       filename2 = FALSE,
-                       userTags = c(cacheTags, "aspectRas"))
-
     ## PROJECT CLIMATE/TOPO RASTERS AS POINTS
-    message(blue("Processing climate data for fire weather and fuel calculation"))
-    slopePoints <- st_as_sf(rasterToPoints(slopeRas, spatial = TRUE))
-    slopePoints <- st_transform(slopePoints, crs = crs(sim$studyAreaFBP))
-
-    aspectPoints <- st_as_sf(rasterToPoints(aspectRas, spatial = TRUE))
-    aspectPoints <- st_transform(aspectPoints, crs = crs(sim$studyAreaFBP))
-
     temperaturePoints <- st_as_sf(rasterToPoints(temperatureRas, spatial = TRUE))
     temperaturePoints <- st_transform(temperaturePoints, crs = crs(sim$studyAreaFBP))
 
@@ -711,14 +683,6 @@ browser()
     relativeHumPoints <- st_transform(relativeHumPoints, crs = crs(sim$studyAreaFBP))
 
     if (getOption("LandR.assertions")) {
-      if (length(unique(c(crs(slopePoints), crs(aspectPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
-        stop("Reprojecting topography data to FBP-compatible lat/long projection failed.\n
-             Please inspect Biomass_fireProperties::firePropertiesInit")
-
-      if (length(unique(c(nrow(slopePoints), nrow(aspectPoints), nrow(sim$rasterToMatchFBPPoints)))) > 1)
-        stop("Topography data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
-             Please inspect Biomass_fireProperties::firePropertiesInit")
-
       if (length(unique(c(crs(temperaturePoints), crs(precipitationPoints),
                           crs(relativeHumPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
         stop("Reprojecting climate data to FBP-compatible lat/long projection failed.\n
