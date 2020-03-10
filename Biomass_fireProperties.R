@@ -39,6 +39,10 @@ defineModule(sim, list(
                     desc = "use caching for the spinup simulation?")
   ),
   inputObjects = bind_rows(
+    expectsInput(objectName = "DEMRas", objectClass = "RasterLayer",
+                 desc = paste("Digital elevation model (DEM) raster used to make 'elevationRas', 'slopeRas' and 'aspectRas'.",
+                              "Ideally the same used by the weather generator to make 'weatherData'."),
+                 sourceURL = "https://drive.google.com/file/d/1Fosf9xfD4UmljwZCxH7MHqsO9EtK4nvp/view?usp=sharing"),
     expectsInput(objectName = "ForestFuelTypes", objectClass = "data.table",
                  desc = "Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code), their - or + contribution ('negSwitch'),
                  min and max age for each species"),
@@ -757,6 +761,21 @@ calcFBPProperties <- function(sim) {
                "but not topoClimDataCRS. Please make sure 'topoClimDataCRS' is also provided."))
   }
 
+  ## DEM RASTER
+  if (!suppliedElsewhere("DEMRas", sim)) {
+    sim$DEMRas <- Cache(prepInputs, targetFile = "DEM1kmRes.tif",
+                        alsoExtract = "DEM1kmRes.prj",
+                        archive = "DEMraster.zip",
+                        destinationPath = dPath,
+                        url = extractURL("DEMRas", sim),
+                        rasterToMatch = sim$rasterToMatch,
+                        maskWithRTM = TRUE,
+                        method = "bilinear",
+                        overwrite = TRUE,
+                        useSAcrs = FALSE,
+                        userTags = c(cacheTags, "DEMRas"),
+                        omitArgs = "userTags")
+  }
 
   ## FWI INITIALISATION DATAFRAME
   ## TODO: FWIinit should be updated every year from previous year's/days/months results
