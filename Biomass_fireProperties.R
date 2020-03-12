@@ -176,15 +176,29 @@ firePropertiesInit <- function(sim) {
   sim$fireYear <- as.integer(P(sim)$fireInitialTime)
 
   ## MAKE TOPO DATA ------------------------------------------
-  ## extract slope and aspect from DEM raster - assume NAs are 0s to remove border effect
-  DEMRas <- sim$DEMRas
-  DEMRas[is.na(DEMRas)] <- 0
-  tempBrick <- terrain(DEMRas, opt = c("slope", "aspect"))
-  tempBrick <- mask(tempBrick, sim$DEMRas)
-  slopeRas <- tempBrick$slope
-  aspectRas <- tempBrick$aspect
-  rm(tempBrick, DEMRas);
-  .gc()
+  ## extract slope and aspect from DEM raster -
+  ## use gdalUtils::gdaldem instead of raster::terrain which was not giving consistent no. of NAs across machines
+  slopeRas <- Cache(gdaldem,
+                    mode = "slope",
+                    input_dem = sim$DEMRas@file@name,
+                    output = file.path(inputPath(sim), "slopeRas.tif"),
+                    output_Raster = TRUE,
+                    compute_edges = TRUE,
+                    p = TRUE,
+                    cacheRepo = cachePath(sim),
+                    userTags = "slopeRas",
+                    omitArgs = c("userTags"))
+
+  aspectRas <- Cache(gdaldem,
+                     mode = "aspect",
+                     input_dem = sim$DEMRas@file@name,
+                     output = file.path(inputPath(sim), "aspectRas.tif"),
+                     output_Raster = TRUE,
+                     compute_edges = TRUE,
+                     trigonometric = TRUE,
+                     cacheRepo = cachePath(sim),
+                     userTags = "aspectRas",
+                     omitArgs = c("userTags"))
 
   ## make points and reproject
   slopePoints <- st_as_sf(rasterToPoints(slopeRas, spatial = TRUE))
@@ -204,8 +218,8 @@ firePropertiesInit <- function(sim) {
   sim$topoData <- data.table(pixelIndex = slopePoints$pixelIndex,
                              longitude = st_coordinates(slopePoints)[,"X"],
                              latitude = st_coordinates(slopePoints)[,"Y"],
-                             slope = slopePoints$slope,
-                             aspect = aspectPoints$aspect)
+                             slope = slopePoints$layer,
+                             aspect = aspectPoints$layer)
 
   ## check that the number of points matches
   if (getOption("LandR.assertions")) {
