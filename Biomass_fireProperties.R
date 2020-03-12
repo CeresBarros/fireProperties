@@ -496,14 +496,22 @@ calcFBPProperties <- function(sim) {
       warning("Some pixels with fuels have no fire weather indices.\n",
               "Please debug Biomass_fireProperties::calcFireProperties")
     }
-  setnames(FTs, "pixelIndex", "ID")
-  FWIoutputs <- FTs[FWIoutputs, on = "ID", nomatch = 0]
+  setnames(FWIoutputs, "ID", "pixelIndex")
+  FWIoutputs <- FTs[FWIoutputs, on = "pixelIndex", nomatch = 0]
 
-  ## add slope and aspect
+  ## add slope, aspect and day/month (convert day to julian day)
   ## again, only keep pixels that have fuels
-  FWIoutputs <- sim$weatherData[, .(ID, slope, aspect)][FWIoutputs, on = "ID", nomatch = 0]
-browser()
-  FBPinputs <- data.frame(id = FWIoutputs$ID,
+  FWIoutputs <- sim$topoData[, .(pixelIndex, slope, aspect)][FWIoutputs, on = "pixelIndex", nomatch = 0]
+  FWIinputs <- data.table(FWIinputs)
+  setnames(FWIinputs, "id", "pixelIndex")
+  FWIoutputs <- FWIinputs[, .(pixelIndex, day, mon)][FWIoutputs, on = "pixelIndex", nomatch = 0]
+  FWIoutputs[, `:=`(mon = as.character(mon),
+                    day = as.character(day))]
+  FWIoutputs[nchar(mon) == 1, mon := paste0("0", mon)]
+  FWIoutputs[nchar(day) == 1, day := paste0("0", day)]
+  FWIoutputs[, julDay := julian(as.Date(paste(1900, mon, day, sep = "-")), origin = as.Date("1900-01-01"))]
+
+  FBPinputs <- data.frame(id = FWIoutputs$pixelIndex,
                           FuelType = FWIoutputs$FuelTypeFBP,
                           LAT = FWIoutputs$LAT,
                           LONG = FWIoutputs$LONG,
@@ -511,7 +519,7 @@ browser()
                           BUI = FWIoutputs$BUI,
                           WS = FWIoutputs$WS,
                           GS = FWIoutputs$slope,
-                          Dj = rep(180, nrow(FWIoutputs)),
+                          Dj = FWIoutputs$julDay,
                           Aspect = FWIoutputs$aspect,
                           PC = FWIoutputs$coniferDom,
                           cc = FWIoutputs$curing)
