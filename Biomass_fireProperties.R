@@ -322,38 +322,42 @@ firePropertiesInit <- function(sim) {
   message(blue("Interpolating weather data for extraction of weather values for each simulated pixel"))
   weatherDataShort <- sim$weatherDataShort
   weatherDataShort <- st_transform(weatherDataShort, crs = st_crs(sim$rasterToMatch))
+  weatherDataShort <- as_Spatial(weatherDataShort) ## convert to sp for gstat
 
-  browser()
-  ## TODO: add month day
-  ## inverse-distance weighted interpolation - only for climate variables
-  fields <- c("precipitation", "temperature", "windSpeed", "relativeHumidity")
-  weatherDataIDWList <- lapply(fields, FUN = function(x) {
+
+  ## nearest neighbour interpolation using 8 neighbours
+  ## although interpolating dates is very weird, so is climate data from different dates.
+  fields <- c("precipitation", "temperature", "windSpeed", "relativeHumidity", "month", "day")
+  weatherDataIntrpList <- lapply(fields, FUN = function(x) {
     form <- as.formula(paste(x, "~ 1"))
-    interpModel <- gstat(formula = form, locations = weatherDataShort)   ## get interpolation model from points
-    weatherDataIDWRas <- interpolate(object = sim$rasterToMatch, model = interpModel)  ## interpolate on RTM
-    mask(weatherDataIDWRas, sim$rasterToMatch)
+    interpModel <- gstat(formula = form, data = weatherDataShort, set = list(idp = 0),
+                         nmax = 8)
+    # interpModel <- gstat(formula = form, locations = weatherDataShort)   ## for IDW interpolation
+    weatherDataIntrpRas <- interpolate(object = sim$rasterToMatch, model = interpModel)  ## interpolate on RTM
+    mask(weatherDataIntrpRas, sim$rasterToMatch)
   })
 
-  names(weatherDataIDWList) <- fields
+  names(weatherDataIntrpList) <- fields
 
-  weatherDataIDWPointsList <- lapply(weatherDataIDWList, FUN = function(x) {
+  weatherDataIntrpPointsList <- lapply(weatherDataIntrpList, FUN = function(x) {
     x <- st_as_sf(rasterToPoints(x, spatial = TRUE))
     x$pixelIndex <- which(!is.na(getValues(sim$rasterToMatch)))
     x <- st_transform(x, crs = crs(sim$studyAreaFBP))
     x
   })
 
-  names(weatherDataIDWPointsList) <- fields
+  names(weatherDataIntrpPointsList) <- fields
 
   weatherDataShort2 <- data.table(pixelIndex = st_drop_geometry(sim$rasterToMatchFBPPoints)$pixelIndex,
                                   longitude = st_coordinates(sim$rasterToMatchFBPPoints)[, "X"],
                                   latitude = st_coordinates(sim$rasterToMatchFBPPoints)[, "Y"])
-  weatherDataShort3 <- data.table(pixelIndex = weatherDataIDWPointsList$precipitation$pixelIndex,
-                                  precipitation = weatherDataIDWPointsList$precipitation$var1.pred,
-                                  temperature = weatherDataIDWPointsList$temperature$var1.pred,
-                                  windSpeed = weatherDataIDWPointsList$windSpeed$var1.pred,
-                                  relativeHumidity = weatherDataIDWPointsList$relativeHumidity$var1.pred)
-
+  weatherDataShort3 <- data.table(pixelIndex = weatherDataIntrpPointsList$precipitation$pixelIndex,
+                                  month = as.integer(weatherDataIntrpPointsList$month$var1.pred),
+                                  day = as.integer(weatherDataIntrpPointsList$day$var1.pred),
+                                  precipitation = weatherDataIntrpPointsList$precipitation$var1.pred,
+                                  temperature = weatherDataIntrpPointsList$temperature$var1.pred,
+                                  windSpeed = weatherDataIntrpPointsList$windSpeed$var1.pred,
+                                  relativeHumidity = weatherDataIntrpPointsList$relativeHumidity$var1.pred)
   ## join and make sure no pixels were lost
   weatherDataShort3 <- weatherDataShort3[weatherDataShort2, on = .(pixelIndex)]
 
