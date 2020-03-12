@@ -233,7 +233,22 @@ firePropertiesInit <- function(sim) {
   }
 
   ## MAKE FIRE WEATHER --------------------------------------
-  ## check first if there's only one weather value per point
+  ## check if there are month and day columns, if not add them with defaults
+  if (any(!c("month", "day") %in% names(sim$weatherData))) {
+    addCols <- c("month", "day")
+    addCols <- addCols[!c("month", "day") %in% names(sim$weatherData)]
+
+    if (length(addCols) == 2) {
+      sim$weatherData$month <- 7  ## default to July
+      sim$weatherData$day <- 1
+    } else {
+      if (addCols == "month")
+        sim$weatherData$month <- 7 else
+          sim$weatherData$day <- 1
+    }
+  }
+
+  ## check if there's only one weather value per point
   coords <- data.table(st_coordinates(sim$weatherData))
   coords <- unique(coords)
   if (!nrow(coords) == nrow(sim$weatherData)) {
