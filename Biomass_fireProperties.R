@@ -113,8 +113,8 @@ defineModule(sim, list(
                   desc = "Raster of total fuel consumed [kg/m^2]"),
     createsOutput(objectName = "fireYear", objectClass = "numeric", desc = "Next fire year"),
     createsOutput(objectName = "weatherDataShort", objectClass = "sf",
-                 desc = paste("Weather point data summarized according to 'fireWeatherMethod', by pixelIndex",
-                              "and on FBP compatible projection")),
+                  desc = paste("Weather point data summarized according to 'fireWeatherMethod', by pixelIndex",
+                               "and on FBP compatible projection")),
     createsOutput(objectName = "topoData", objectClass = "data.table",
                   desc = paste("Table with slope and aspect values extracted from 'DEMRas', by pixelIndex",
                                "and on FBP compatible projection")),
@@ -460,7 +460,6 @@ calcFBPProperties <- function(sim) {
 
   ## FWI ------------------------------
   ## make/update table of FWI inputs
-  browser()
   FWIinputs <- data.frame(id = sim$weatherDataShort$pixelIndex,
                           lat = sim$weatherDataShort$latitude,
                           long = sim$weatherDataShort$longitude,
@@ -491,6 +490,7 @@ calcFBPProperties <- function(sim) {
   ## note that because climate/topo data is "larger" there are pixels that have no fuels - these are removed.
 
   ## check pixelIndex matches (there shouldn't be any)
+
   if (getOption("LandR.assertions"))
     if (!all(FTs$pixelIndex %in% FWIoutputs$ID)) {
       warning("Some pixels with fuels have no fire weather indices.\n",
