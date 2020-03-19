@@ -234,14 +234,13 @@ firePropertiesInit <- function(sim) {
 
   ## MAKE FIRE WEATHER --------------------------------------
   ## check if there are month and day columns, if not add them with defaults
-  if (any(!c("month", "day") %in% names(sim$weatherData))) {
-    addCols <- c("month", "day")
-    addCols <- addCols[!c("month", "day") %in% names(sim$weatherData)]
-
-    if (length(addCols) == 2) {
-      sim$weatherData$month <- 7  ## default to July
-      sim$weatherData$day <- 1
-    } else {
+  addCols <- c("month", "day")
+  addCols <- addCols[!c("month", "day") %in% names(sim$weatherData)]
+  if (length(addCols) == 2) {
+    sim$weatherData$month <- 7  ## default to July
+    sim$weatherData$day <- 1
+  } else {
+    if (length(addCols) == 1) {
       if (addCols == "month")
         sim$weatherData$month <- 7 else
           sim$weatherData$day <- 1
@@ -323,7 +322,6 @@ firePropertiesInit <- function(sim) {
   weatherDataShort <- sim$weatherDataShort
   weatherDataShort <- st_transform(weatherDataShort, crs = st_crs(sim$rasterToMatch))
   weatherDataShort <- as_Spatial(weatherDataShort) ## convert to sp for gstat
-
 
   ## nearest neighbour interpolation using 8 neighbours
   ## although interpolating dates is very weird, so is climate data from different dates.
@@ -411,7 +409,7 @@ calcFBPProperties <- function(sim) {
   curingDT <- as.data.table(st_drop_geometry(curingPoints))
   RTMpixelIndex <- data.table(pixelIndex = sim$rasterToMatchFBPPoints$pixelIndex)
 
-  ## make table of final fuel types by joining
+  ## make table of final fuel types by merging
   FTs <- Reduce(function(x,y) merge.data.table(x, y, by = "pixelIndex", all = TRUE),
                 list(fuelTypeDT, coniferDomDT, curingDT, RTMpixelIndex))
   setnames(FTs, old = names(FTs), new = c("pixelIndex", "FuelType", "coniferDom", "curing"))
@@ -441,7 +439,6 @@ calcFBPProperties <- function(sim) {
   D1No <- unique(sim$ForestFuelTypes[FuelTypeFBP == "D2", FuelType]) - 1
   FTs[FuelTypeFBP == "D2", `:=` (FuelTypeFBP = "D1",
                                  FuelType = D1No)]
-
 
   ## check for duplicates (there shouldn't be any)
   if (getOption("LandR.assertions"))
@@ -499,7 +496,7 @@ calcFBPProperties <- function(sim) {
   setnames(FWIoutputs, "ID", "pixelIndex")
   FWIoutputs <- FTs[FWIoutputs, on = "pixelIndex", nomatch = 0]
 
-  ## add slope, aspect and day/month (convert day to julian day)
+  ## add slope, aspect and day/month (convert date to julian day)
   ## again, only keep pixels that have fuels
   FWIoutputs <- sim$topoData[, .(pixelIndex, slope, aspect)][FWIoutputs, on = "pixelIndex", nomatch = 0]
   FWIinputs <- data.table(FWIinputs)
