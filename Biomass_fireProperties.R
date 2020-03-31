@@ -2,8 +2,8 @@
 # are put into the simList. To use objects and functions, use sim$xxx.
 defineModule(sim, list(
   name = "Biomass_fireProperties",
-  description = "Complement to fire spread that calculates fire (behaviour) properties in fucntion of vegetation, climate and topography conditions
-  usign the Canadian Forest Fire Behaviour Prediction System",
+  description = paste("Complement to fire spread that calculates fire (behaviour) properties in function of vegetation (fuels),",
+                      "climate and topography conditions, using the Canadian Forest Fire Behaviour Prediction System"),
   keywords = c("fire behaviour", "fuels", "fire-vegetation feedbacks", "fire-climate feedbacks", "FBP system", "topography"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
