@@ -43,9 +43,6 @@ defineModule(sim, list(
                  desc = paste("Digital elevation model (DEM) raster used to make 'elevationRas', 'slopeRas' and 'aspectRas'.",
                               "Ideally the same used by the weather generator to make 'weatherData'."),
                  sourceURL = "https://drive.google.com/file/d/1Fosf9xfD4UmljwZCxH7MHqsO9EtK4nvp/view?usp=sharing"),
-    expectsInput(objectName = "ForestFuelTypes", objectClass = "data.table",
-                 desc = "Table of Fuel Type parameters, with  base fuel type, species (in LANDIS code), their - or + contribution ('negSwitch'),
-                 min and max age for each species"),
     expectsInput(objectName = "fuelTypesMaps", objectClass = "list",
                  desc = "List of RasterLayers of fuel types and coniferDominance per pixel."),
     expectsInput(objectName = "FWIinit", objectClass = "data.frame",
@@ -419,7 +416,9 @@ calcFBPProperties <- function(sim) {
   FTs <- FTs[!pixelIndex %in% pixNoFuels]
 
   ## add FBP forest fuel type names
-  FTs <- unique(sim$ForestFuelTypes[, .(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
+  FTequivTable <- as.data.table(raster::levels(sim$fuelTypesMaps$finalFuelType)[[1]])
+  setnames(FTequivTable, "ID", "FuelType")
+  FTs <- unique(FTequivTable[, .(FuelTypeFBP, FuelType)])[FTs, on = "FuelType"]
 
   ## add FBP non-forest fuel type names if running fires in non-forested pixels
   if (!is.null(sim$pixelNonForestFuels)) {
@@ -436,9 +435,28 @@ calcFBPProperties <- function(sim) {
   FTs <- FTs[!is.na(FuelType)]
 
   ## replace all D2s for D1s - cffdrs::fbp does not include D2
-  D1No <- unique(sim$ForestFuelTypes[FuelTypeFBP == "D2", FuelType]) - 1
-  FTs[FuelTypeFBP == "D2", `:=` (FuelTypeFBP = "D1",
-                                 FuelType = D1No)]
+  ## need to make a new FuelType if D1 doesn't exist already
+  if (any(FTequivTable$FuelTypeFBP == "D2")) {
+    message(blue("Replacing all D2 fuel types by D1, as cffdrs::fbp does not include D2"))
+    D1No <- unique(FTequivTable[FuelTypeFBP == "D1", FuelType])
+    if (length(D1No)) {
+      FTs[FuelTypeFBP == "D2", `:=` (FuelTypeFBP = "D1", FuelType = D1No)]
+    } else {
+      D1No <- max(FTequivTable$FuelType) + 1
+      FTs[FuelTypeFBP == "D2", `:=` (FuelTypeFBP = "D1", FuelType = D1No)]
+
+      rclmat <- matrix(c(FTequivTable[FuelTypeFBP == "D2", FuelType], D1No),
+                       nrow = 1, ncol = 2, byrow = TRUE)
+      sim$fuelTypesMaps$finalFuelType <- reclassify(sim$fuelTypesMaps$finalFuelType, rclmat)
+      sim$fuelTypesMaps$finalFuelType <- ratify(sim$fuelTypesMaps$finalFuelType)
+      levs <- as.data.table(raster::levels(sim$fuelTypesMaps$finalFuelType)[[1]])
+      levs2 <- unique(FTs[, .(FuelType, FuelTypeFBP)])
+      setnames(levs2, "FuelType", "ID")
+      levs <- levs2[levs, on = "ID"]
+      levels(sim$fuelTypesMaps$finalFuelType) <- as.data.frame(levs)
+      setColors(sim$fuelTypesMaps$finalFuelType, n = nrow(levs)) <- brewer.pal(n = nrow(levs), "Accent")
+    }
+  }
 
   ## check for duplicates (there shouldn't be any)
   if (getOption("LandR.assertions"))
