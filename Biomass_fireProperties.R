@@ -44,10 +44,11 @@ defineModule(sim, list(
                               "Ideally the same used by the weather generator to make 'weatherData'."),
                  sourceURL = "https://drive.google.com/file/d/1Fosf9xfD4UmljwZCxH7MHqsO9EtK4nvp/view?usp=sharing"),
     expectsInput(objectName = "fuelTypesMaps", objectClass = "list",
-                 desc = "List of RasterLayers of fuel types and coniferDominance per pixel."),
+                 desc = paste("List of RasterLayers of fuel types ('finalFuelType'), coniferDominance ('coniferDom'), and optionally",
+                              "the degree of curing ('curing') per pixel. 'finalFuelType' needs to be a ratified raster (raster with levels)")),
     expectsInput(objectName = "FWIinit", objectClass = "data.frame",
-                 desc = "Initalisation parameter values for FWI calculations. Defaults to default values in cffdrs::fwi.
-                 This table should be updated every year"),
+                 desc = paste("Initalisation parameter values for FWI calculations. Defaults to default values in cffdrs::fwi.
+                 This table should be updated every year)")),
     expectsInput(objectName = "pixelGroupMap", objectClass = "RasterLayer",
                  desc = "updated community map at each succession time step"),
     expectsInput(objectName = "pixelNonForestFuels", objectClass = "data.table",
@@ -65,11 +66,11 @@ defineModule(sim, list(
     expectsInput("studyArea", "SpatialPolygonsDataFrame",
                  desc = paste("Polygon to use as the study area.",
                               "Defaults to  an area in Southwestern Alberta, Canada."),
-                 sourceURL = ""),
+                 sourceURL = NA),
     expectsInput(objectName = "studyAreaFBP", objectClass = "SpatialPolygonsDataFrame",
                  desc = paste("same as studyArea, but on FBP-compatible lat/long projection:",
                               "'+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'"),
-                 sourceURL = ""),
+                 sourceURL = NA),
     expectsInput(objectName = "topoData", objectClass = "data.table",
                  desc = paste("Table with slope and aspect values extracted from 'DEMRas', by pixelIndex",
                               "and on FBP compatible projection")),
@@ -114,7 +115,7 @@ defineModule(sim, list(
                                "and on FBP compatible projection")),
     createsOutput(objectName = "topoData", objectClass = "data.table",
                   desc = paste("Table with slope and aspect values extracted from 'DEMRas', by pixelIndex",
-                               "and on FBP compatible projection")),
+                               "and on FBP compatible projection"))
   )
 ))
 
