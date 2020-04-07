@@ -808,6 +808,8 @@ calcFBPProperties <- function(sim) {
     ## this is a quickfix - best solution is to get another, larger DEM:
     ## input average ngb values
     if (sum(!is.na(sim$DEMRas[])) < sum(!is.na(sim$rasterToMatch[]))) {
+      rasFileName <- filename(sim$DEMRas)
+
       pixMismatch <- which(is.na(sim$DEMRas[]) & !is.na(sim$rasterToMatch[]))
       ngbs <- as.data.table(adjacent(sim$DEMRas, pixMismatch, directions = 8, sorted = TRUE))
 
@@ -819,6 +821,10 @@ calcFBPProperties <- function(sim) {
       inputVals[is.na(fromAvgVal), fromAvgVal := 0]
 
       sim$DEMRas[inputVals$from] <- inputVals$fromAvgVal
+
+      ## overwrite raster and reload (otherwise we lose the filename for later)
+      writeRaster(sim$DEMRas, filename = rasFileName, overwrite = TRUE)
+      sim$DEMRas <- raster(rasFileName)
     }
   }
 
