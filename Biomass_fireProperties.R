@@ -178,14 +178,14 @@ firePropertiesInit <- function(sim) {
   ## use gdalUtils::gdaldem instead of raster::terrain which was not giving consistent no. of NAs across machines
   ## don't cache, beause Cache won't be able to tell if the input raster  changed if the name hasn't
   slopeRas <- gdaldem(mode = "slope",
-                      input_dem = sim$DEMRas@file@name,
+                      input_dem = filename(sim$DEMRas),
                       output = file.path(inputPath(sim), "slopeRas.tif"),
                       output_Raster = TRUE,
                       compute_edges = TRUE,
                       p = TRUE)
 
   aspectRas <- gdaldem(mode = "aspect",
-                       input_dem = sim$DEMRas@file@name,
+                       input_dem = file.name(sim$DEMRas),
                        output = file.path(inputPath(sim), "aspectRas.tif"),
                        output_Raster = TRUE,
                        compute_edges = TRUE,
