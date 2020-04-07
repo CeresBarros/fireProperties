@@ -176,27 +176,20 @@ firePropertiesInit <- function(sim) {
   ## MAKE TOPO DATA ------------------------------------------
   ## extract slope and aspect from DEM raster -
   ## use gdalUtils::gdaldem instead of raster::terrain which was not giving consistent no. of NAs across machines
-  slopeRas <- Cache(gdaldem,
-                    mode = "slope",
-                    input_dem = sim$DEMRas@file@name,
-                    output = file.path(inputPath(sim), "slopeRas.tif"),
-                    output_Raster = TRUE,
-                    compute_edges = TRUE,
-                    p = TRUE,
-                    cacheRepo = cachePath(sim),
-                    userTags = "slopeRas",
-                    omitArgs = c("userTags"))
+  ## don't cache, beause Cache won't be able to tell if the input raster  changed if the name hasn't
+  slopeRas <- gdaldem(mode = "slope",
+                      input_dem = sim$DEMRas@file@name,
+                      output = file.path(inputPath(sim), "slopeRas.tif"),
+                      output_Raster = TRUE,
+                      compute_edges = TRUE,
+                      p = TRUE)
 
-  aspectRas <- Cache(gdaldem,
-                     mode = "aspect",
-                     input_dem = sim$DEMRas@file@name,
-                     output = file.path(inputPath(sim), "aspectRas.tif"),
-                     output_Raster = TRUE,
-                     compute_edges = TRUE,
-                     trigonometric = TRUE,
-                     cacheRepo = cachePath(sim),
-                     userTags = "aspectRas",
-                     omitArgs = c("userTags"))
+  aspectRas <- gdaldem(mode = "aspect",
+                       input_dem = sim$DEMRas@file@name,
+                       output = file.path(inputPath(sim), "aspectRas.tif"),
+                       output_Raster = TRUE,
+                       compute_edges = TRUE,
+                       trigonometric = TRUE)
 
   ## make points and reproject
   slopePoints <- st_as_sf(rasterToPoints(slopeRas, spatial = TRUE))
