@@ -810,6 +810,23 @@ calcFBPProperties <- function(sim) {
                         useSAcrs = FALSE,
                         userTags = c(cacheTags, "DEMRas"),
                         omitArgs = "userTags")
+
+    ## the DEM used in BioSIM loses pixels (has more NA's) after reproj.
+    ## this is a quickfix - best solution is to get another, larger DEM:
+    ## input average ngb values
+    if (sum(!is.na(sim$DEMRas[])) < sum(!is.na(sim$rasterToMatch[]))) {
+      pixMismatch <- which(is.na(sim$DEMRas[]) & !is.na(sim$rasterToMatch[]))
+      ngbs <- as.data.table(adjacent(sim$DEMRas, pixMismatch, directions = 8, sorted = TRUE))
+
+      ngbsVals <- data.table(to = ngbs$to, toVals = sim$DEMRas[ngbs$to])
+      ngbs <- ngbsVals[ngbs, on = .(to)]
+      ngbs[, fromAvgVal := mean(toVals, na.rm = TRUE), by = from]
+
+      inputVals <- unique(ngbs[, .(from, fromAvgVal)])
+      inputVals[is.na(fromAvgVal), fromAvgVal := 0]
+
+      sim$DEMRas[inputVals$from] <- inputVals$fromAvgVal
+    }
   }
 
   ## FWI INITIALISATION DATAFRAME
