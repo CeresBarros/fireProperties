@@ -793,7 +793,7 @@ calcFBPProperties <- function(sim) {
   if (!suppliedElsewhere("DEMRas", sim)) {
     sim$DEMRas <- Cache(prepInputs, targetFile = "DEM1kmRes.tif",
                         alsoExtract = "DEM1kmRes.prj",
-                        archive = "DEMraster.zip",
+                        archive = "DEMrasters.zip",
                         destinationPath = dPath,
                         url = extractURL("DEMRas", sim),
                         rasterToMatch = sim$rasterToMatch,
