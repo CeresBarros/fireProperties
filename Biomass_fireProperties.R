@@ -185,7 +185,7 @@ firePropertiesInit <- function(sim) {
                       p = TRUE)
 
   aspectRas <- gdaldem(mode = "aspect",
-                       input_dem = file.name(sim$DEMRas),
+                       input_dem = filename(sim$DEMRas),
                        output = file.path(inputPath(sim), "aspectRas.tif"),
                        output_Raster = TRUE,
                        compute_edges = TRUE,
