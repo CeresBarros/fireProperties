@@ -190,6 +190,16 @@ firePropertiesInit <- function(sim) {
                        output_Raster = TRUE,
                        compute_edges = TRUE,
                        trigonometric = TRUE)
+  ## if they differ in number of NAs, input data from neighbours
+  if (sum(!is.na(slopeRas[])) < sum(!is.na(sim$DEMRas[]))) {
+    pixMismatch <- which(is.na(slopeRas[]) & !is.na(sim$DEMRas[]))
+    slopeRas <- inputValsFromNgbs(ras = slopeRas, cells = pixMismatch)
+  }
+
+  if (sum(!is.na(aspectRas[])) < sum(!is.na(sim$DEMRas[]))) {
+    pixMismatch <- which(is.na(aspectRas[]) & !is.na(sim$DEMRas[]))
+    aspectRas <- inputValsFromNgbs(ras = aspectRas, cells = pixMismatch)
+  }
 
   ## make points and reproject
   slopePoints <- st_as_sf(rasterToPoints(slopeRas, spatial = TRUE))
@@ -808,23 +818,8 @@ calcFBPProperties <- function(sim) {
     ## this is a quickfix - best solution is to get another, larger DEM:
     ## input average ngb values
     if (sum(!is.na(sim$DEMRas[])) < sum(!is.na(sim$rasterToMatch[]))) {
-      rasFileName <- filename(sim$DEMRas)
-
       pixMismatch <- which(is.na(sim$DEMRas[]) & !is.na(sim$rasterToMatch[]))
-      ngbs <- as.data.table(adjacent(sim$DEMRas, pixMismatch, directions = 8, sorted = TRUE))
-
-      ngbsVals <- data.table(to = ngbs$to, toVals = sim$DEMRas[ngbs$to])
-      ngbs <- ngbsVals[ngbs, on = .(to)]
-      ngbs[, fromAvgVal := mean(toVals, na.rm = TRUE), by = from]
-
-      inputVals <- unique(ngbs[, .(from, fromAvgVal)])
-      inputVals[is.na(fromAvgVal), fromAvgVal := 0]
-
-      sim$DEMRas[inputVals$from] <- inputVals$fromAvgVal
-
-      ## overwrite raster and reload (otherwise we lose the filename for later)
-      writeRaster(sim$DEMRas, filename = rasFileName, overwrite = TRUE)
-      sim$DEMRas <- raster(rasFileName)
+      sim$DEMRas <- inputValsFromNgbs(ras = sim$DEMRas, cells = pixMismatch)
     }
   }
 
