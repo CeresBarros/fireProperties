@@ -190,6 +190,7 @@ firePropertiesInit <- function(sim) {
                        output_Raster = TRUE,
                        compute_edges = TRUE,
                        trigonometric = TRUE)
+
   ## if they differ in number of NAs, input data from neighbours
   if (sum(!is.na(slopeRas[])) < sum(!is.na(sim$DEMRas[]))) {
     pixMismatch <- which(is.na(slopeRas[]) & !is.na(sim$DEMRas[]))
@@ -207,6 +208,9 @@ firePropertiesInit <- function(sim) {
   aspectPoints <- st_as_sf(rasterToPoints(aspectRas, spatial = TRUE))
   aspectPoints <- st_transform(aspectPoints, crs = crs(sim$studyAreaFBP))
 
+  names(slopePoints) <- c("slope", "geometry")
+  names(aspectPoints) <- c("aspect", "geometry")
+
   ## join to get IDs
   slopePoints <- st_join(slopePoints, sim$rasterToMatchFBPPoints,
                          join = st_nearest_feature)
@@ -219,8 +223,8 @@ firePropertiesInit <- function(sim) {
   sim$topoData <- data.table(pixelIndex = slopePoints$pixelIndex,
                              longitude = st_coordinates(slopePoints)[,"X"],
                              latitude = st_coordinates(slopePoints)[,"Y"],
-                             slope = slopePoints$layer,
-                             aspect = aspectPoints$layer)
+                             slope = slopePoints$slope,
+                             aspect = aspectPoints$aspect)
 
   ## check that the number of points matches
   if (getOption("LandR.assertions")) {
