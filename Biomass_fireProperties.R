@@ -617,27 +617,37 @@ calcFBPProperties <- function(sim) {
   }
 
   if (needRTM) {
-    if (!suppliedElsewhere("rawBiomassMap", sim)) {
+    if (!suppliedElsewhere("rawBiomassMap", sim) ||
+        !compareRaster(sim$rawBiomassMap, sim$studyArea, stopiffalse = FALSE)) {
       rawBiomassMapURL <- paste0("http://ftp.maps.canada.ca/pub/nrcan_rncan/Forests_Foret/",
                                  "canada-forests-attributes_attributs-forests-canada/",
                                  "2001-attributes_attributs-2001/",
                                  "NFI_MODIS250m_2001_kNN_Structure_Biomass_TotalLiveAboveGround_v1.tif")
-
+      rawBiomassMapFilename <- "NFI_MODIS250m_2001_kNN_Structure_Biomass_TotalLiveAboveGround_v1.tif"
       rawBiomassMap <- Cache(prepInputs,
                              targetFile = rawBiomassMapFilename,
                              url = rawBiomassMapURL,
                              destinationPath = dPath,
                              studyArea = sim$studyArea,
-                             rasterToMatch = if (!needRTM) sim$rasterToMatch else NULL,
-                             # maskWithRTM = TRUE,    ## if RTM not supplied no masking happens (is this intended?)
-                             maskWithRTM = if (!needRTM) TRUE else FALSE,
-                             ## TODO: if RTM is not needed use SA CRS? -> this is not correct
-                             # useSAcrs = if (!needRTM) TRUE else FALSE,
+                             rasterToMatch = NULL,
+                             maskWithRTM = FALSE,
                              useSAcrs = FALSE,     ## never use SA CRS
                              method = "bilinear",
                              datatype = "INT2U",
                              filename2 = NULL,
                              userTags = c(cacheTags, "rawBiomassMap"),
+                             omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
+    } else {
+      rawBiomassMap <- Cache(postProcess,
+                             x = sim$rawBiomassMap,
+                             studyArea = sim$studyArea,
+                             useSAcrs = FALSE,
+                             maskWithRTM = FALSE,   ## mask with SA
+                             method = "bilinear",
+                             datatype = "INT2U",
+                             filename2 = NULL,
+                             overwrite = TRUE,
+                             userTags = cacheTags,
                              omitArgs = c("destinationPath", "targetFile", "userTags", "stable"))
     }
 
