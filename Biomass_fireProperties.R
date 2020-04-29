@@ -598,7 +598,7 @@ calcFBPProperties <- function(sim) {
   }
 
   ## if necessary reproject to lat/long - for compatibility with FBP
-  if (!identical(latLong, crs(sim$studyAreaFBP))) {
+  if (!compareCRS(latLong, crs(sim$rasterToMatch))) {
     sim$studyAreaFBP <- spTransform(sim$studyAreaFBP, latLong) #faster without Cache
   }
 
@@ -667,7 +667,7 @@ calcFBPProperties <- function(sim) {
                                omitArgs = c("userTags"))
   }
 
-  if (!identical(crs(sim$studyArea), crs(sim$rasterToMatch))) {
+  if (!compareCRS(sim$studyArea, sim$rasterToMatch)) {
     warning(paste0("studyArea and rasterToMatch projections differ.\n",
                    "studyArea will be projected to match rasterToMatchLarge"))
     sim$studyArea <- spTransform(sim$studyArea, crs(sim$rasterToMatch))
