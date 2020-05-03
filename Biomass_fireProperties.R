@@ -35,6 +35,8 @@ defineModule(sim, list(
                     desc = "The number of time units between successive fire events in a fire module"),
     defineParameter(".plotMaps", "logical", FALSE, NA, NA, "This describes whether maps should be plotted or not"),
     defineParameter(".plotInterval", "numeric", 1, NA, NA, "This describes the simulation time interval between plot events"),
+    defineParameter(".studyAreaName", "character", NA, NA, NA,
+                    "Human-readable name for the study area used. If NA, a hash of studyArea will be used."),
     defineParameter(".useCache", "logical", "init", NA, NA,
                     desc = "use caching for the spinup simulation?")
   ),
