@@ -823,6 +823,7 @@ calcFBPProperties <- function(sim) {
                         rasterToMatch = sim$rasterToMatch,
                         maskWithRTM = TRUE,
                         method = "bilinear",
+                        filename2 = .suffix("DEMRas.tif", paste0("_", P(sim)$.studyAreaName)),
                         overwrite = TRUE,
                         useSAcrs = FALSE,
                         userTags = c(cacheTags, "DEMRas"),
