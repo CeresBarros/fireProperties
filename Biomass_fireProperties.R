@@ -699,7 +699,7 @@ calcFBPProperties <- function(sim) {
                             alsoExtract = NA,
                             destinationPath = dPath,
                             fun = "raster",
-                            filename2 = FALSE,
+                            filename2 = NULL,
                             userTags = cacheTags)
     temperatureRas <- temperatureRas/10  ## back transform temp values
 
@@ -712,7 +712,7 @@ calcFBPProperties <- function(sim) {
                             rasterToMatch = sim$rasterToMatch,
                             maskWithRTM = TRUE,
                             method = "bilinear",
-                            filename2 = FALSE,
+                            filename2 = NULL,
                             userTags = c(cacheTags, "temperatureRas"))
 
     message(blue("Getting default 'precipitationRas' to make default 'weatherData'.",
@@ -724,7 +724,7 @@ calcFBPProperties <- function(sim) {
                               alsoExtract = NA,
                               destinationPath = dPath,
                               fun = "raster",
-                              filename2 = FALSE,
+                              filename2 = NULL,
                               userTags = cacheTags)
 
     ## add the original CRS if it's not defined
@@ -736,7 +736,7 @@ calcFBPProperties <- function(sim) {
                               rasterToMatch = sim$rasterToMatch,
                               maskWithRTM = TRUE,
                               method = "bilinear",
-                              filename2 = FALSE,
+                              filename2 = NULL,
                               userTags = c(cacheTags, "precipitationRas"))
 
     message(blue("Getting default 'relativeHumRas' to make default 'weatherData'.",
@@ -748,7 +748,7 @@ calcFBPProperties <- function(sim) {
                             alsoExtract = NA,
                             destinationPath = dPath,
                             fun = "raster",
-                            filename2 = FALSE,
+                            filename2 = NULL,
                             userTags = cacheTags)
 
     ## add the original CRS if it's not defined
@@ -760,7 +760,7 @@ calcFBPProperties <- function(sim) {
                             rasterToMatch = sim$rasterToMatch,
                             maskWithRTM = TRUE,
                             method = "bilinear",
-                            filename2 = FALSE,
+                            filename2 = NULL,
                             userTags = c(cacheTags, "relativeHumRas"))
 
     ## PROJECT CLIMATE/TOPO RASTERS AS POINTS
