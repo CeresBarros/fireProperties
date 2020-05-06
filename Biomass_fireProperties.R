@@ -9,7 +9,8 @@ defineModule(sim, list(
   childModules = character(0),
   version = list(Biomass_fireProperties = numeric_version("0.2.0"),
                  Biomass_core = numeric_version("1.3.2"),
-                 LandR = "0.0.3.9000", SpaDES.core = "0.2.7"),
+                 LandR = "0.0.3.9000", SpaDES.core = "0.2.7",
+                 raster = "3.1-5"),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
@@ -788,7 +789,7 @@ calcFBPProperties <- function(sim) {
     }
 
     message(blue(currentModule(sim), " is making 'weatherData' from default temperature, precipitation and relative humidity raster layers"))
-    sim$weatherDataCRS <- st_crs(sim$rasterToMatchFBPPoints)$proj4string
+    sim$weatherDataCRS <- crs(sim$rasterToMatchFBPPoints)
     weatherData <- data.table(temperature = temperaturePoints[, 1, drop = TRUE],
                               precipitation = precipitationPoints[, 1, drop = TRUE],
                               relativeHumidity = relativeHumPoints[, 1, drop = TRUE],
