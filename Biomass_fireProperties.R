@@ -9,7 +9,8 @@ defineModule(sim, list(
   childModules = character(0),
   version = list(Biomass_fireProperties = numeric_version("0.2.0"),
                  Biomass_core = numeric_version("1.3.2"),
-                 LandR = "0.0.3.9000", SpaDES.core = "0.2.7"),
+                 LandR = "0.0.3.9000", SpaDES.core = "0.2.7",
+                 raster = "3.1-5"),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
@@ -35,6 +36,8 @@ defineModule(sim, list(
                     desc = "The number of time units between successive fire events in a fire module"),
     defineParameter(".plotMaps", "logical", FALSE, NA, NA, "This describes whether maps should be plotted or not"),
     defineParameter(".plotInterval", "numeric", 1, NA, NA, "This describes the simulation time interval between plot events"),
+    defineParameter(".studyAreaName", "character", NA, NA, NA,
+                    "Human-readable name for the study area used. If NA, a hash of studyArea will be used."),
     defineParameter(".useCache", "logical", "init", NA, NA,
                     desc = "use caching for the spinup simulation?")
   ),
@@ -699,7 +702,7 @@ calcFBPProperties <- function(sim) {
                             alsoExtract = NA,
                             destinationPath = dPath,
                             fun = "raster",
-                            filename2 = FALSE,
+                            filename2 = NULL,
                             userTags = cacheTags)
     temperatureRas <- temperatureRas/10  ## back transform temp values
 
@@ -712,7 +715,7 @@ calcFBPProperties <- function(sim) {
                             rasterToMatch = sim$rasterToMatch,
                             maskWithRTM = TRUE,
                             method = "bilinear",
-                            filename2 = FALSE,
+                            filename2 = NULL,
                             userTags = c(cacheTags, "temperatureRas"))
 
     message(blue("Getting default 'precipitationRas' to make default 'weatherData'.",
@@ -724,7 +727,7 @@ calcFBPProperties <- function(sim) {
                               alsoExtract = NA,
                               destinationPath = dPath,
                               fun = "raster",
-                              filename2 = FALSE,
+                              filename2 = NULL,
                               userTags = cacheTags)
 
     ## add the original CRS if it's not defined
@@ -736,7 +739,7 @@ calcFBPProperties <- function(sim) {
                               rasterToMatch = sim$rasterToMatch,
                               maskWithRTM = TRUE,
                               method = "bilinear",
-                              filename2 = FALSE,
+                              filename2 = NULL,
                               userTags = c(cacheTags, "precipitationRas"))
 
     message(blue("Getting default 'relativeHumRas' to make default 'weatherData'.",
@@ -748,7 +751,7 @@ calcFBPProperties <- function(sim) {
                             alsoExtract = NA,
                             destinationPath = dPath,
                             fun = "raster",
-                            filename2 = FALSE,
+                            filename2 = NULL,
                             userTags = cacheTags)
 
     ## add the original CRS if it's not defined
@@ -760,7 +763,7 @@ calcFBPProperties <- function(sim) {
                             rasterToMatch = sim$rasterToMatch,
                             maskWithRTM = TRUE,
                             method = "bilinear",
-                            filename2 = FALSE,
+                            filename2 = NULL,
                             userTags = c(cacheTags, "relativeHumRas"))
 
     ## PROJECT CLIMATE/TOPO RASTERS AS POINTS
@@ -786,7 +789,7 @@ calcFBPProperties <- function(sim) {
     }
 
     message(blue(currentModule(sim), " is making 'weatherData' from default temperature, precipitation and relative humidity raster layers"))
-    sim$weatherDataCRS <- st_crs(sim$rasterToMatchFBPPoints)$proj4string
+    sim$weatherDataCRS <- crs(sim$rasterToMatchFBPPoints)
     weatherData <- data.table(temperature = temperaturePoints[, 1, drop = TRUE],
                               precipitation = precipitationPoints[, 1, drop = TRUE],
                               relativeHumidity = relativeHumPoints[, 1, drop = TRUE],
@@ -823,6 +826,7 @@ calcFBPProperties <- function(sim) {
                         rasterToMatch = sim$rasterToMatch,
                         maskWithRTM = TRUE,
                         method = "bilinear",
+                        filename2 = .suffix("DEMRas.tif", paste0("_", P(sim)$.studyAreaName)),
                         overwrite = TRUE,
                         useSAcrs = FALSE,
                         userTags = c(cacheTags, "DEMRas"),
