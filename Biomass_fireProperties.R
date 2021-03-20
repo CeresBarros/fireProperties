@@ -16,7 +16,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.txt", "Biomass_fireProperties.Rmd"),
-  reqdPkgs = list("R.utils", "raster", "data.table", "dplyr", "gdalUtils",
+  reqdPkgs = list("R.utils", "raster", "data.table", "dplyr", "gdalUtilities",
                   "sp", "sf", "cffdrs", "amc", "fasterize", "gstat", "crayon",
                   "PredictiveEcology/LandR@development",
                   "PredictiveEcology/SpaDES.core@development",
@@ -179,20 +179,28 @@ firePropertiesInit <- function(sim) {
   ## MAKE TOPO DATA ------------------------------------------
   ## extract slope and aspect from DEM raster -
   ## use gdalUtils::gdaldem instead of raster::terrain which was not giving consistent no. of NAs across machines
-  ## don't cache, beause Cache won't be able to tell if the input raster  changed if the name hasn't
+  ## don't cache, because Cache won't be able to tell if the input raster  changed if the name hasn't
   slopeRas <- gdaldem(mode = "slope",
-                      input_dem = filename(sim$DEMRas),
-                      output = file.path(inputPath(sim), "slopeRas.tif"),
-                      output_Raster = TRUE,
-                      compute_edges = TRUE,
-                      p = TRUE)
+                                     input_dem = filename(sim$DEMRas),
+                                     output_map = normalizePath(file.path(inputPath(sim), "slopeRas.tif")),
+                                     compute_edges = TRUE,
+                                     p = TRUE)
+  if (file.exists(slopeRas)) {
+    slopeRas <- raster(slopeRas)
+  } else {
+    stop("Could not calculate/save slope raster from DEM")
+  }
 
   aspectRas <- gdaldem(mode = "aspect",
                        input_dem = filename(sim$DEMRas),
-                       output = file.path(inputPath(sim), "aspectRas.tif"),
-                       output_Raster = TRUE,
+                       output_map = file.path(inputPath(sim), "aspectRas.tif"),
                        compute_edges = TRUE,
                        trigonometric = TRUE)
+  if (file.exists(aspectRas)) {
+    aspectRas <- raster(aspectRas)
+  } else {
+    stop("Could not calculate/save aspect raster from DEM")
+  }
 
   ## if they differ in number of NAs, input data from neighbours
   if (sum(!is.na(slopeRas[])) < sum(!is.na(sim$DEMRas[]))) {
