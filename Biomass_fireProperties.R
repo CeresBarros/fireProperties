@@ -162,7 +162,7 @@ doEvent.Biomass_fireProperties = function(sim, eventTime, eventType, debug = FAL
 
 ### module initialization
 firePropertiesInit <- function(sim) {
-  message(blue("Processing climate data for fire weather and fuel calculation"))
+  message(blue("Processing climate and topo. data for fire weather and fuel calculation"))
   cacheTags <- c(currentModule(sim), "firePropertiesInit")
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
 
@@ -181,10 +181,10 @@ firePropertiesInit <- function(sim) {
   ## use gdalUtils::gdaldem instead of raster::terrain which was not giving consistent no. of NAs across machines
   ## don't cache, because Cache won't be able to tell if the input raster  changed if the name hasn't
   slopeRas <- gdaldem(mode = "slope",
-                                     input_dem = filename(sim$DEMRas),
-                                     output_map = normalizePath(file.path(inputPath(sim), "slopeRas.tif")),
-                                     compute_edges = TRUE,
-                                     p = TRUE)
+                      input_dem = filename(sim$DEMRas),
+                      output_map = normalizePath(file.path(inputPath(sim), "slopeRas.tif")),
+                      compute_edges = TRUE,
+                      p = TRUE)
   if (file.exists(slopeRas)) {
     slopeRas <- raster(slopeRas)
   } else {
