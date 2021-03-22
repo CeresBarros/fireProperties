@@ -855,7 +855,7 @@ calcFBPProperties <- function(sim) {
     sim$FWIinit <- data.frame(ffmc = 85, dmc = 6, dc = 15)
   }
 
-  if(!suppliedElsewhere("pixelNonForestFuels", sim)) {
+  if (!suppliedElsewhere("pixelNonForestFuels", sim)) {
     sim$pixelNonForestFuels <- NULL
   }
 
