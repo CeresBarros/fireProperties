@@ -613,6 +613,12 @@ calcFBPProperties <- function(sim) {
     sim$studyAreaFBP <- spTransform(sim$studyAreaFBP, latLong) #faster without Cache
   }
 
+  if (is.na(P(sim)$.studyAreaName)) {
+    params(sim)[[currentModule(sim)]][[".studyAreaName"]] <- reproducible::studyAreaName(sim$studyAreaLarge)
+    message("The .studyAreaName is not supplied; derived name from sim$studyAreaLarge: ",
+            params(sim)[[currentModule(sim)]][[".studyAreaName"]])
+  }
+
   ## RASTER TO MATCH
   needRTM <- FALSE
   if (is.null(sim$rasterToMatch)) {
@@ -671,11 +677,14 @@ calcFBPProperties <- function(sim) {
     sim$rasterToMatch <- rawBiomassMap
     RTMvals <- getValues(sim$rasterToMatch)
     sim$rasterToMatch[!is.na(RTMvals)] <- 1
-    sim$rasterToMatch <- Cache(writeOutputs, sim$rasterToMatch,
-                               filename2 = file.path(cachePath(sim), "rasters", "rasterToMatch.tif"),
-                               datatype = "INT2U", overwrite = TRUE,
-                               userTags = c(cacheTags, "rasterToMatch"),
-                               omitArgs = c("userTags"))
+
+    sim$rasterToMatch <- Cache(writeOutputs,
+      sim$rasterToMatch,
+      filename2 = .suffix(file.path(dPath, "rasterToMatch.tif"), paste0("_", P(sim)$.studyAreaName)),
+      datatype = "INT2U",
+      overwrite = TRUE,
+      userTags = c(cacheTags, "rasterToMatch"),
+      omitArgs = c("userTags"))
   }
 
   if (!compareCRS(sim$studyArea, sim$rasterToMatch)) {
