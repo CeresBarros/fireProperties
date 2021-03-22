@@ -614,8 +614,8 @@ calcFBPProperties <- function(sim) {
   }
 
   if (is.na(P(sim)$.studyAreaName)) {
-    params(sim)[[currentModule(sim)]][[".studyAreaName"]] <- reproducible::studyAreaName(sim$studyAreaLarge)
-    message("The .studyAreaName is not supplied; derived name from sim$studyAreaLarge: ",
+    params(sim)[[currentModule(sim)]][[".studyAreaName"]] <- reproducible::studyAreaName(sim$studyAreaFBP)
+    message("The .studyAreaName is not supplied; derived name from sim$studyAreaFBP: ",
             params(sim)[[currentModule(sim)]][[".studyAreaName"]])
   }
 
