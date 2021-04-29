@@ -7,16 +7,13 @@ defineModule(sim, list(
   keywords = c("fire behaviour", "fuels", "fire-vegetation feedbacks", "fire-climate feedbacks", "FBP system", "topography"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = list(Biomass_fireProperties = numeric_version("0.2.0"),
-                 Biomass_core = numeric_version("1.3.2"),
-                 LandR = "0.0.3.9000", SpaDES.core = "0.2.7",
-                 raster = "3.1-5"),
+  version = list(Biomass_fireProperties = numeric_version("0.2.0")),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.txt", "Biomass_fireProperties.Rmd"),
-  reqdPkgs = list("R.utils", "raster", "data.table", "dplyr", "gdalUtils",
+  reqdPkgs = list("R.utils", "raster", "data.table", "dplyr", "gdalUtilities",
                   "sp", "sf", "cffdrs", "amc", "fasterize", "gstat", "crayon",
                   "PredictiveEcology/LandR@development",
                   "PredictiveEcology/SpaDES.core@development",
@@ -162,7 +159,7 @@ doEvent.Biomass_fireProperties = function(sim, eventTime, eventType, debug = FAL
 
 ### module initialization
 firePropertiesInit <- function(sim) {
-  message(blue("Processing climate data for fire weather and fuel calculation"))
+  message(blue("Processing climate and topo. data for fire weather and fuel calculation"))
   cacheTags <- c(currentModule(sim), "firePropertiesInit")
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
 
@@ -179,20 +176,28 @@ firePropertiesInit <- function(sim) {
   ## MAKE TOPO DATA ------------------------------------------
   ## extract slope and aspect from DEM raster -
   ## use gdalUtils::gdaldem instead of raster::terrain which was not giving consistent no. of NAs across machines
-  ## don't cache, beause Cache won't be able to tell if the input raster  changed if the name hasn't
+  ## don't cache, because Cache won't be able to tell if the input raster  changed if the name hasn't
   slopeRas <- gdaldem(mode = "slope",
                       input_dem = filename(sim$DEMRas),
-                      output = file.path(inputPath(sim), "slopeRas.tif"),
-                      output_Raster = TRUE,
+                      output_map = normalizePath(file.path(inputPath(sim), "slopeRas.tif")),
                       compute_edges = TRUE,
                       p = TRUE)
+  if (file.exists(slopeRas)) {
+    slopeRas <- raster(slopeRas)
+  } else {
+    stop("Could not calculate/save slope raster from DEM")
+  }
 
   aspectRas <- gdaldem(mode = "aspect",
                        input_dem = filename(sim$DEMRas),
-                       output = file.path(inputPath(sim), "aspectRas.tif"),
-                       output_Raster = TRUE,
+                       output_map = file.path(inputPath(sim), "aspectRas.tif"),
                        compute_edges = TRUE,
                        trigonometric = TRUE)
+  if (file.exists(aspectRas)) {
+    aspectRas <- raster(aspectRas)
+  } else {
+    stop("Could not calculate/save aspect raster from DEM")
+  }
 
   ## if they differ in number of NAs, input data from neighbours
   if (sum(!is.na(slopeRas[])) < sum(!is.na(sim$DEMRas[]))) {
@@ -593,9 +598,9 @@ calcFBPProperties <- function(sim) {
 
   if (!suppliedElsewhere("studyAreaFBP", sim)) {
     if (!suppliedElsewhere("studyArea", sim)) {
-      if (getOption("LandR.verbose", TRUE) > 0)
-        message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
-      sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)
+      stop("Please provide a 'studyArea' polygon")
+      # message("'studyArea' was not provided by user. Using a polygon (6250000 m^2) in southwestern Alberta, Canada")
+      # sim$studyArea <- randomStudyArea(seed = 1234, size = (250^2)*100)  # Jan 2021 we agreed to force user to provide a SA/SAL
     }
     sim$studyAreaFBP <- sim$studyArea
   }
@@ -603,6 +608,12 @@ calcFBPProperties <- function(sim) {
   ## if necessary reproject to lat/long - for compatibility with FBP
   if (!compareCRS(latLong, crs(sim$rasterToMatch))) {
     sim$studyAreaFBP <- spTransform(sim$studyAreaFBP, latLong) #faster without Cache
+  }
+
+  if (is.na(P(sim)$.studyAreaName)) {
+    params(sim)[[currentModule(sim)]][[".studyAreaName"]] <- reproducible::studyAreaName(sim$studyAreaFBP)
+    message("The .studyAreaName is not supplied; derived name from sim$studyAreaFBP: ",
+            params(sim)[[currentModule(sim)]][[".studyAreaName"]])
   }
 
   ## RASTER TO MATCH
@@ -663,11 +674,14 @@ calcFBPProperties <- function(sim) {
     sim$rasterToMatch <- rawBiomassMap
     RTMvals <- getValues(sim$rasterToMatch)
     sim$rasterToMatch[!is.na(RTMvals)] <- 1
-    sim$rasterToMatch <- Cache(writeOutputs, sim$rasterToMatch,
-                               filename2 = file.path(cachePath(sim), "rasters", "rasterToMatch.tif"),
-                               datatype = "INT2U", overwrite = TRUE,
-                               userTags = c(cacheTags, "rasterToMatch"),
-                               omitArgs = c("userTags"))
+
+    sim$rasterToMatch <- Cache(writeOutputs,
+      sim$rasterToMatch,
+      filename2 = .suffix(file.path(dPath, "rasterToMatch.tif"), paste0("_", P(sim)$.studyAreaName)),
+      datatype = "INT2U",
+      overwrite = TRUE,
+      userTags = c(cacheTags, "rasterToMatch"),
+      omitArgs = c("userTags"))
   }
 
   if (!compareCRS(sim$studyArea, sim$rasterToMatch)) {
@@ -847,7 +861,7 @@ calcFBPProperties <- function(sim) {
     sim$FWIinit <- data.frame(ffmc = 85, dmc = 6, dc = 15)
   }
 
-  if(!suppliedElsewhere("pixelNonForestFuels", sim)) {
+  if (!suppliedElsewhere("pixelNonForestFuels", sim)) {
     sim$pixelNonForestFuels <- NULL
   }
 
