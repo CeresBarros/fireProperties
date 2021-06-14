@@ -49,6 +49,10 @@ defineModule(sim, list(
     expectsInput(objectName = "FWIinit", objectClass = "data.frame",
                  desc = paste("Initalisation parameter values for FWI calculations. Defaults to default values in cffdrs::fwi.
                  This table should be updated every year)")),
+    expectsInput(objectName = "nonForestFuelsTable", objectClass = "data.table",
+                 desc = paste("Table of correspondence between non-forested land-cover classes and fire fuels.",
+                              "Fuel types come from CF Fire Behaviour Prediction System (2nd Ed.). Default values",
+                              "use the LCC2005 land-cover product, and consider only grasslands and shurblands.")),
     expectsInput(objectName = "pixelGroupMap", objectClass = "RasterLayer",
                  desc = "updated community map at each succession time step"),
     expectsInput(objectName = "pixelNonForestFuels", objectClass = "data.table",
@@ -863,6 +867,21 @@ calcFBPProperties <- function(sim) {
 
   if (!suppliedElsewhere("pixelNonForestFuels", sim)) {
     sim$pixelNonForestFuels <- NULL
+  }
+
+  if (!suppliedElsewhere("nonForestFuelsTable", sim)) {
+    ## for non forest fuels classified as open vegetation/grassland (O1a, O1b)
+    ## the decree of curing needs to be defined, and whether it is fixed (only mean necessary)
+    ## or drawn from a distribution (mean, min and max required)
+    ## if drawn from a distribution, a normal distribution with right-side fat tail will be used (Perrakis, pers. comm.)
+    ## mean, min and max values from Perrakis (pers. comm.)
+    sim$nonForestFuelsTable <- data.table(LC = c(16, 17, 21, 22, 23, 24, 25),
+                                          FuelTypeFBP = c("O1b", "O1b", "O1b", "O1b", "O1b", "O1b", "NF"),
+                                          FuelType = c(15, 15, 15, 15, 15, 15, 19),
+                                          fixedCuring = c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, NA),
+                                          curingMean = c(60, 60, 60, 60, 35, 30, NA),
+                                          curingMin = c(50, 50, 50, 50, 0, 30, NA),
+                                          curingMax = c(80, 80, 80, 80, 60, 30, NA))
   }
 
   return(invisible(sim))
