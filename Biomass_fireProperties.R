@@ -38,7 +38,7 @@ defineModule(sim, list(
     defineParameter(".useCache", "logical", "init", NA, NA,
                     desc = "use caching for the spinup simulation?")
   ),
-  inputObjects = bind_rows(
+  inputObjects = bindrows(
     expectsInput(objectName = "DEMRas", objectClass = "RasterLayer",
                  desc = paste("Digital elevation model (DEM) raster used to make 'elevationRas', 'slopeRas' and 'aspectRas'.",
                               "Ideally the same used by the weather generator to make 'weatherData'."),
@@ -90,7 +90,7 @@ defineModule(sim, list(
                  desc = paste("The original projection of the climate data table. Must be supplied if",
                               "weatherData is supplied by the user or a module."))
   ),
-  outputObjects = bind_rows(
+  outputObjects = bindrows(
     # createsOutput(objectName = "FBPinputs", objectClass = "RasterLayer",
     #               desc = "Fire behaviour prediction system inputs table"),
     # createsOutput(objectName = "FBPoutputs", objectClass = "list",
