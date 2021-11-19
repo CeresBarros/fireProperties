@@ -1,18 +1,18 @@
 # Everything in this file gets sourced during simInit, and all functions and objects
 # are put into the simList. To use objects and functions, use sim$xxx.
 defineModule(sim, list(
-  name = "Biomass_fireProperties",
+  name = "fireProperties",
   description = paste("Complement to fire spread that calculates fire (behaviour) properties in function of vegetation (fuels),",
                       "climate and topography conditions, using the Canadian Forest Fire Behaviour Prediction System"),
   keywords = c("fire behaviour", "fuels", "fire-vegetation feedbacks", "fire-climate feedbacks", "FBP system", "topography"),
   authors = person("Ceres", "Barros", email = "cbarros@mail.ubc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = list(Biomass_fireProperties = numeric_version("0.2.0")),
+  version = list(fireProperties = numeric_version("0.2.0")),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
-  documentation = list("README.txt", "Biomass_fireProperties.Rmd"),
+  documentation = list("README.txt", "fireProperties.Rmd"),
   reqdPkgs = list("R.utils", "raster", "data.table", "dplyr", "gdalUtilities",
                   "sp", "sf", "cffdrs", "amc", "fasterize", "gstat", "crayon",
                   "PredictiveEcology/LandR@development",
@@ -123,7 +123,7 @@ defineModule(sim, list(
   )
 ))
 
-doEvent.Biomass_fireProperties = function(sim, eventTime, eventType, debug = FALSE) {
+doEvent.fireProperties = function(sim, eventTime, eventType, debug = FALSE) {
   switch(
     eventType,
     init = {
@@ -131,7 +131,7 @@ doEvent.Biomass_fireProperties = function(sim, eventTime, eventType, debug = FAL
       sim <- firePropertiesInit(sim)
 
       ## schedule future event(s)
-      sim <- scheduleEvent(sim, P(sim)$fireInitialTime, "Biomass_fireProperties",
+      sim <- scheduleEvent(sim, P(sim)$fireInitialTime, "fireProperties",
                            "calcFireProperties", eventPriority = 2.25) ## always calculate fire parameters before the first fire time
     },
     calcFireProperties = {
@@ -149,7 +149,7 @@ doEvent.Biomass_fireProperties = function(sim, eventTime, eventType, debug = FAL
 
           ## schedule future event(s)
           ## only calculate parameters in fire years.
-          sim <- scheduleEvent(sim, time(sim) + P(sim)$fireTimestep, "Biomass_fireProperties",
+          sim <- scheduleEvent(sim, time(sim) + P(sim)$fireTimestep, "fireProperties",
                                "calcFireProperties", eventPriority = 2.25)
         }
       }
@@ -242,11 +242,11 @@ firePropertiesInit <- function(sim) {
   if (getOption("LandR.assertions")) {
     if (length(unique(c(crs(slopePoints), crs(aspectPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
       stop("Reprojecting topography data to FBP-compatible lat/long projection failed.\n
-             Please inspect Biomass_fireProperties::firePropertiesInit")
+             Please inspect fireProperties::firePropertiesInit")
 
     if (length(unique(c(nrow(slopePoints), nrow(aspectPoints), nrow(sim$rasterToMatchFBPPoints)))) > 1)
       stop("Topography data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
-             Please inspect Biomass_fireProperties::firePropertiesInit")
+             Please inspect fireProperties::firePropertiesInit")
   }
 
   ## MAKE FIRE WEATHER --------------------------------------
@@ -418,7 +418,7 @@ calcFBPProperties <- function(sim) {
     if (length(unique(c(crs(fuelTypePoints), crs(coniferDomPoints),
                         crs(curingPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
       stop("Reprojecting climate data to FBP-compatible lat/long projection failed.\n
-             Please inspect Biomass_fireProperties::firePropertiesInit")
+             Please inspect fireProperties::firePropertiesInit")
   }
 
   fuelTypeDT <- as.data.table(st_drop_geometry(fuelTypePoints))
@@ -482,7 +482,7 @@ calcFBPProperties <- function(sim) {
   if (getOption("LandR.assertions"))
     if (any(duplicated(FTs))) {
       stop("Duplicated pixels found in fuel types table.",
-           " Please debug Biomass_fireProperties calcFBPProperties() event function")
+           " Please debug fireProperties calcFBPProperties() event function")
     }
 
   ## check all pixel indices are part of RTM
@@ -490,7 +490,7 @@ calcFBPProperties <- function(sim) {
     if (!all(FTs$pixelIndex %in% which(!is.na(getValues(sim$rasterToMatch)))) &
         !all(FTs$pixelIndex %in% sim$rasterToMatchFBPPoints$pixelIndex)) {
       stop("Wrong pixel indices attributed to fuel types.\n",
-           "Please debug Biomass_fireProperties::calcFireProperties")
+           "Please debug fireProperties::calcFireProperties")
     }
 
   ## FWI ------------------------------
@@ -508,7 +508,7 @@ calcFBPProperties <- function(sim) {
   if (getOption("LandR.assertions"))
     if (!all(FTs$pixelIndex %in% FWIinputs$id)) {
       warning("Some pixels with fuels have no climate data.\n",
-              "Please debug Biomass_fireProperties::calcFireProperties")
+              "Please debug fireProperties::calcFireProperties")
     }
 
   ## calculate FW indices
@@ -529,7 +529,7 @@ calcFBPProperties <- function(sim) {
   if (getOption("LandR.assertions"))
     if (!all(FTs$pixelIndex %in% FWIoutputs$ID)) {
       warning("Some pixels with fuels have no fire weather indices.\n",
-              "Please debug Biomass_fireProperties::calcFireProperties")
+              "Please debug fireProperties::calcFireProperties")
     }
   setnames(FWIoutputs, "ID", "pixelIndex")
   FWIoutputs <- FTs[FWIoutputs, on = "pixelIndex", nomatch = 0]
@@ -712,7 +712,7 @@ calcFBPProperties <- function(sim) {
   ## note that some Climate NA data were multiplied by 10
   if (!suppliedElsewhere("weatherData", sim)) {
     message(blue("Getting default 'temperatureRas' to make default 'weatherData'.",
-                 "If this is not correct, make sure Biomass_fireProperties can detect 'weatherData' is supplied"))
+                 "If this is not correct, make sure fireProperties can detect 'weatherData' is supplied"))
     ## get default temperature values, summer average
     temperatureRas <- Cache(prepInputs, targetFile = "Tave_sm.asc",
                             url = extractURL("temperatureRas", sim),
@@ -737,7 +737,7 @@ calcFBPProperties <- function(sim) {
                             userTags = c(cacheTags, "temperatureRas"))
 
     message(blue("Getting default 'precipitationRas' to make default 'weatherData'.",
-                 "If this is not correct, make sure Biomass_fireProperties can detect 'weatherData' is supplied"))
+                 "If this is not correct, make sure fireProperties can detect 'weatherData' is supplied"))
     ## get default precipitation values, summer cummulative precipitation
     precipitationRas <- Cache(prepInputs, targetFile = "PPT_sm.asc",
                               url = extractURL("precipitationRas", sim),
@@ -761,7 +761,7 @@ calcFBPProperties <- function(sim) {
                               userTags = c(cacheTags, "precipitationRas"))
 
     message(blue("Getting default 'relativeHumRas' to make default 'weatherData'.",
-                 "If this is not correct, make sure Biomass_fireProperties can detect 'weatherData' is supplied"))
+                 "If this is not correct, make sure fireProperties can detect 'weatherData' is supplied"))
     ## get default precipitation values, summer average
     relativeHumRas <- Cache(prepInputs, targetFile = "RH_sm.asc",
                             url = extractURL("relativeHumRas", sim),
@@ -798,12 +798,12 @@ calcFBPProperties <- function(sim) {
       if (length(unique(c(crs(temperaturePoints), crs(precipitationPoints),
                           crs(relativeHumPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
         stop("Reprojecting climate data to FBP-compatible lat/long projection failed.\n
-             Please inspect Biomass_fireProperties::firePropertiesInit")
+             Please inspect fireProperties::firePropertiesInit")
 
       if (length(unique(c(nrow(temperaturePoints), nrow(precipitationPoints),
                           nrow(relativeHumPoints), nrow(sim$rasterToMatchFBPPoints)))) > 1)
         stop("Climate data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
-             Please inspect Biomass_fireProperties::firePropertiesInit")
+             Please inspect fireProperties::firePropertiesInit")
     }
 
     message(blue(currentModule(sim), " is making 'weatherData' from default temperature, precipitation and relative humidity raster layers"))
@@ -830,7 +830,7 @@ calcFBPProperties <- function(sim) {
     sim$weatherData <- weatherData
   } else {
     if (!suppliedElsewhere("weatherDataCRS", sim))
-      stop(red("'weatherData' appears to be supplied to Biomass_fireProperties,",
+      stop(red("'weatherData' appears to be supplied to fireProperties,",
                "but not weatherDataCRS. Please make sure 'weatherDataCRS' is also provided."))
   }
 

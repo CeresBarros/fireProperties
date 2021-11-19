@@ -1,5 +1,5 @@
 ---
-title: "Biomass_fireProperties"
+title: "fireProperties"
 author: ""
 date: "18 March 2020"
 output: pdf_document
@@ -34,7 +34,7 @@ parameters <- list(
   #module1 = list(param1 = value1, param2 = value2),
   #module2 = list(param1 = value1, param2 = value2)
 )
-modules <- list("Biomass_fireProperties")
+modules <- list("fireProperties")
 objects <- list()
 inputs <- list()
 outputs <- list()
@@ -50,7 +50,7 @@ mySimOut <- spades(mySim)
 Provide a summary of user-visible parameters.
 
 ```{r moduleParams}
-df_params <- moduleParams("Biomass_fireProperties", "..")
+df_params <- moduleParams("fireProperties", "..")
 knitr::kable(df_params)
 ```
 

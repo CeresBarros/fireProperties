@@ -3,7 +3,7 @@
 # please specify the package you need to run the sim function in the test files.
 
 # to test all the test files in the tests folder:
-test_dir("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/m/Biomass_fireProperties/tests/testthat")
+test_dir("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/m/fireProperties/tests/testthat")
 
 # Alternative, you can use test_file to test individual test file, e.g.:
-test_file("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/m/Biomass_fireProperties/tests/testthat/test-template.R")
+test_file("C:/Ceres/GitHub/LandscapesInMotion/R/SpaDES/m/fireProperties/tests/testthat/test-template.R")
