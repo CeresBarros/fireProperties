@@ -13,7 +13,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.txt", "fireProperties.Rmd"),
-  reqdPkgs = list("R.utils", "raster", "data.table", "dplyr", "gdalUtilities",
+  reqdPkgs = list("R.utils", "raster", "terra", "data.table", "dplyr", "gdalUtilities",
                   "sp", "sf", "cffdrs", "amc", "fasterize", "gstat", "crayon",
                   "PredictiveEcology/LandR@development",
                   "PredictiveEcology/SpaDES.core@development",
@@ -337,29 +337,32 @@ firePropertiesInit <- function(sim) {
   ## 4. add coordinates
   message(blue("Interpolating weather data for extraction of weather values for each simulated pixel"))
   weatherDataShort <- st_transform(weatherDataShort, crs = st_crs(sim$rasterToMatch))
-  weatherDataShort <- as_Spatial(weatherDataShort) ## convert to sp for gstat
+  weatherDataShort <- as_Spatial(weatherDataShort) ## convert to sp for gstat/as.data.frame
+  weatherDataShort <- as.data.frame(weatherDataShort)
+  names(weatherDataShort)[grepl("coord", names(weatherDataShort))] <- c("x", "y")
 
   ## nearest neighbour interpolation using 8 neighbours
   ## although interpolating dates is very weird, so is climate data from different dates.
   fields <- c("precipitation", "temperature", "windSpeed", "relativeHumidity", "month", "day")
-  weatherDataIntrpList <- lapply(fields, FUN = function(x) {
-    form <- as.formula(paste(x, "~ 1"))
-    interpModel <- gstat(formula = form, data = weatherDataShort, set = list(idp = 0),
-                         nmax = 8)
-    # interpModel <- gstat(formula = form, locations = weatherDataShort)   ## for IDW interpolation
-    weatherDataIntrpRas <- interpolate(object = sim$rasterToMatch, model = interpModel)  ## interpolate on RTM
-    mask(weatherDataIntrpRas, sim$rasterToMatch)
-  })
-
+  weatherDataIntrpList <- Cache(Map,
+                                f = IDWWrapperFun,
+                                field = fields,
+                                MoreArgs = list(rasTemplate = rast(sim$rasterToMatch),
+                                                data = weatherDataShort,
+                                                set = list(idp = 0.5),
+                                                locations = ~x+y,
+                                                maxdist = 10000),
+                                userTags = c(cacheTags, "weatherIDW"),
+                                omitArgs = c("userTags"))
   names(weatherDataIntrpList) <- fields
 
-  weatherDataIntrpPointsList <- lapply(weatherDataIntrpList, FUN = function(x) {
-    x <- st_as_sf(rasterToPoints(x, spatial = TRUE))
-    x$pixelIndex <- which(!is.na(getValues(sim$rasterToMatch)))
-    x <- st_transform(x, crs = crs(sim$studyAreaFBP))
-    x
-  })
-
+  weatherDataIntrpPointsList <- Cache(Map,
+                                      f = .rasterToPoints,
+                                      ras = weatherDataIntrpList,
+                                      MoreArgs = list(rasterToMatch = rast(sim$rasterToMatch),
+                                                      crs = crs(sim$studyAreaFBP)),
+                                      userTags = c(cacheTags, "weatherIDW2Points"),
+                                      omitArgs = c("userTags"))
   names(weatherDataIntrpPointsList) <- fields
 
   weatherDataShort2 <- data.table(pixelIndex = st_drop_geometry(sim$rasterToMatchFBPPoints)$pixelIndex,
