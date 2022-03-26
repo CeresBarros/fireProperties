@@ -321,12 +321,12 @@ firePropertiesInit <- function(sim) {
     weatherDataShort <- st_as_sf(weatherDataShort, coords = c("longitude", "latitude"),
                                  crs = sim$weatherDataCRS, agr = "constant")
     ## export to sim - don't replace weatherData - if sampling we need the full data intact
-    sim$weatherDataShort <- weatherDataShort
+    weatherDataShort <- weatherDataShort
     rm(weatherDataShort)
     .gc()
   } else {
     message(blue("Only one weather value found per spatial point. No sampling or averaging of weather data will be done"))
-    sim$weatherDataShort <- sim$weatherData
+    weatherDataShort <- sim$weatherData
   }
 
   ## INTERPOLATE WEATHER TO RASTERTOMATCH AND RE-MAKE SHORT WEATHER TABLE
@@ -336,7 +336,6 @@ firePropertiesInit <- function(sim) {
   ## 3. make a table using pixIDs
   ## 4. add coordinates
   message(blue("Interpolating weather data for extraction of weather values for each simulated pixel"))
-  weatherDataShort <- sim$weatherDataShort
   weatherDataShort <- st_transform(weatherDataShort, crs = st_crs(sim$rasterToMatch))
   weatherDataShort <- as_Spatial(weatherDataShort) ## convert to sp for gstat
 
