@@ -681,12 +681,12 @@ calcFBPProperties <- function(sim) {
     sim$rasterToMatch[!is.na(RTMvals)] <- 1
 
     sim$rasterToMatch <- Cache(writeOutputs,
-      sim$rasterToMatch,
-      filename2 = .suffix(file.path(dPath, "rasterToMatch.tif"), paste0("_", P(sim)$.studyAreaName)),
-      datatype = "INT2U",
-      overwrite = TRUE,
-      userTags = c(cacheTags, "rasterToMatch"),
-      omitArgs = c("userTags"))
+                               sim$rasterToMatch,
+                               filename2 = .suffix(file.path(dPath, "rasterToMatch.tif"), paste0("_", P(sim)$.studyAreaName)),
+                               datatype = "INT2U",
+                               overwrite = TRUE,
+                               userTags = c(cacheTags, "rasterToMatch"),
+                               omitArgs = c("userTags"))
   }
 
   if (!compareCRS(sim$studyArea, sim$rasterToMatch)) {
