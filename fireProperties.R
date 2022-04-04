@@ -128,7 +128,7 @@ doEvent.fireProperties = function(sim, eventTime, eventType, debug = FALSE) {
     eventType,
     init = {
       ## Initialise module
-      sim <- firePropertiesInit(sim)
+      sim <- Init(sim)
 
       ## schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$fireInitialTime, "fireProperties",
@@ -162,7 +162,7 @@ doEvent.fireProperties = function(sim, eventTime, eventType, debug = FALSE) {
 }
 
 ### module initialization
-firePropertiesInit <- function(sim) {
+Init <- function(sim) {
   message(blue("Processing climate and topo. data for fire weather and fuel calculation"))
   cacheTags <- c(currentModule(sim), "firePropertiesInit")
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
@@ -242,11 +242,11 @@ firePropertiesInit <- function(sim) {
   if (getOption("LandR.assertions")) {
     if (length(unique(c(crs(slopePoints), crs(aspectPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
       stop("Reprojecting topography data to FBP-compatible lat/long projection failed.\n
-             Please inspect fireProperties::firePropertiesInit")
+             Please inspect fireProperties::Init")
 
     if (length(unique(c(nrow(slopePoints), nrow(aspectPoints), nrow(sim$rasterToMatchFBPPoints)))) > 1)
       stop("Topography data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
-             Please inspect fireProperties::firePropertiesInit")
+             Please inspect fireProperties::Init")
   }
 
   ## MAKE FIRE WEATHER --------------------------------------
@@ -420,7 +420,7 @@ calcFBPProperties <- function(sim) {
     if (length(unique(c(crs(fuelTypePoints), crs(coniferDomPoints),
                         crs(curingPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
       stop("Reprojecting climate data to FBP-compatible lat/long projection failed.\n
-             Please inspect fireProperties::firePropertiesInit")
+             Please inspect fireProperties::Init")
   }
 
   fuelTypeDT <- as.data.table(st_drop_geometry(fuelTypePoints))
@@ -800,12 +800,12 @@ calcFBPProperties <- function(sim) {
       if (length(unique(c(crs(temperaturePoints), crs(precipitationPoints),
                           crs(relativeHumPoints), crs(sim$rasterToMatchFBPPoints)))) > 1)
         stop("Reprojecting climate data to FBP-compatible lat/long projection failed.\n
-             Please inspect fireProperties::firePropertiesInit")
+             Please inspect fireProperties::Init")
 
       if (length(unique(c(nrow(temperaturePoints), nrow(precipitationPoints),
                           nrow(relativeHumPoints), nrow(sim$rasterToMatchFBPPoints)))) > 1)
         stop("Climate data layers and rasterToMatch differ in number of points in FBP-compatible lat/long projection.\n
-             Please inspect fireProperties::firePropertiesInit")
+             Please inspect fireProperties::Init")
     }
 
     message(blue(currentModule(sim), " is making 'weatherData' from default temperature, precipitation and relative humidity raster layers"))
