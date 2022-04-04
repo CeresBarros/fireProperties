@@ -322,7 +322,6 @@ Init <- function(sim) {
                                  crs = sim$weatherDataCRS, agr = "constant")
     ## export to sim - don't replace weatherData - if sampling we need the full data intact
     weatherDataShort <- weatherDataShort
-    rm(weatherDataShort)
     .gc()
   } else {
     message(blue("Only one weather value found per spatial point. No sampling or averaging of weather data will be done"))
