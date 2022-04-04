@@ -19,7 +19,7 @@ defineModule(sim, list(
                   "PredictiveEcology/SpaDES.core@development",
                   "PredictiveEcology/SpaDES.tools@development",
                   "PredictiveEcology/reproducible@development"),
-  parameters = rbind(
+  parameters = bindrows(
     defineParameter("fireWeatherMethod", "character", "sample", NA, NA,
                     desc = paste("How fire weather is summarized by location. When 'weatherData' contains",
                                  "several fire weather observations (i.e. fire-days' weather values) per point,",
