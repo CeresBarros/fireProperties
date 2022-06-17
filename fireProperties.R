@@ -16,9 +16,9 @@ defineModule(sim, list(
   reqdPkgs = list("R.utils", "raster", "terra", "data.table", "dplyr", "gdalUtilities",
                   "sp", "sf", "cffdrs", "amc", "fasterize", "gstat", "crayon",
                   "PredictiveEcology/LandR@development",
-                  "PredictiveEcology/SpaDES.core@development",
-                  "PredictiveEcology/SpaDES.tools@development",
-                  "PredictiveEcology/reproducible@development"),
+                  "PredictiveEcology/SpaDES.core (>= 1.0.8.9014)",
+                  "PredictiveEcology/SpaDES.tools (>= 0.3.8.9000)",
+                  "PredictiveEcology/reproducible (>= 1.2.8)"),
   parameters = bindrows(
     defineParameter("fireWeatherMethod", "character", "sample", NA, NA,
                     desc = paste("How fire weather is summarized by location. When 'weatherData' contains",
